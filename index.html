@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/images/android-launchericon-192-192.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#ff9900" />
+    <title>Cashu Monopoly</title>
+  </head>
+  <body>
+    
+    <!-- ================= CASHU MODAL START ================= -->
+    <div id="buyin-modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.98); z-index:99999; color:white; display:none; flex-direction:column; align-items:center; justify-content:center; text-align: center; font-family: sans-serif;">
+      <h1 style="color: #ff9900; font-size: 3em; margin: 0;">⚡ Cashu Monopoly 🎩</h1>
+      <h1 style="color:red; z-index:9999; position:fixed; top:0;">TESTING MODE</h1> 
+      
+      <!-- STEP 1: CONFIGURATION -->
+      <div id="step-config" style="margin-top:20px; width: 80%; max-width: 500px;">
+          <p style="font-size: 1.5em; margin-bottom: 20px;">Game Setup</p>
+          
+          <!-- ROW 1: PLAYERS & AMOUNT -->
+          <div style="display:flex; gap: 20px; justify-content: center; margin-bottom: 15px;">
+              <div style="text-align:left;">
+                  <label style="color:#aaa; font-size:0.9em;">Players</label><br>
+                  <input type="number" id="player-count" value="2" min="2" max="8" style="padding:10px; font-size:1.2em; width:80px; text-align:center; border-radius:5px; border:none;">
+              </div>
+              <div style="text-align:left;">
+                  <label style="color:#aaa; font-size:0.9em;">Buy-in (sats)</label><br>
+                  <input type="number" id="buyin-amount" value="1500" min="500" step="100" style="padding:10px; font-size:1.2em; width:120px; text-align:center; border-radius:5px; border:none;">
+              </div>
+          </div>
+
+          <!-- ROW 2: MINT SELECTION -->
+          <div style="text-align:left; margin-bottom: 20px;">
+              <label style="color:#aaa; font-size:0.9em;">Select Mint</label><br>
+              <select id="mint-selector" style="width:100%; padding:10px; font-size:1.1em; border-radius:5px; border:none; margin-top:5px;">
+                  <option value="https://testnut.cashu.space">TestNut (Testnet)</option>
+                  <option value="https://mint.minibits.cash/Bitcoin">Minibits (Bitcoin)</option>
+                  <option value="custom">Custom URL...</option>
+              </select>
+              <input type="text" id="custom-mint-input" placeholder="https://..." style="display:none; width:95%; margin-top:10px; padding:10px; font-size:1.1em; border-radius:5px; border:none;">
+          </div>
+
+          <h3 id="total-display" style="color: #4CAF50;">Total Pot: 3000 Sats</h3>
+          
+          <!-- NOTE: The onclick is removed here. We will attach the listener in main.ts -->
+          <button id="btn-generate-invoice" style="margin-top: 10px; padding: 15px 40px; background: #ff9900; border: none; color: white; font-size: 1.2em; font-weight:bold; cursor: pointer; border-radius: 5px;">
+              Generate Invoice
+          </button>
+          
+          <footer id="social-footer">
+            <a href="https://github.com/bTCpy/monopoly" target="_blank" title="View Code on GitHub">
+                <svg class="social-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.137 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                </svg>
+            </a>
+          </footer>
+      </div>
+
+      <!-- STEP 2: PAYMENT -->
+      <div id="step-payment" style="display:none; flex-direction:column; align-items:center;">
+          <p style="font-size: 1.5em; margin-bottom: 20px;" id="scan-instruction">Scan to deposit...</p>
+          <img id="qr-image" src="" alt="Generating QR..." style="background:white; padding:10px; width: 300px; height: 300px; border-radius: 10px; display:none;"/>
+          <p id="status" style="margin-top: 20px; font-family: monospace; font-size: 1.2em; color: #aaa;">Generating Invoice...</p>
+          <button id="btn-skip-payment" style="margin-top: 30px; padding: 10px 20px; background: #333; border: 1px solid #555; color: #888; cursor: pointer; border-radius: 5px;">
+              👉 Demo Mode: Skip Payment
+          </button>
+      </div>
+    </div>
+    <!-- ================= CASHU MODAL END ================= -->
+
+    <div id="popupbackground"></div>
+    <div id="popupwrap">
+      <div id="popup">
+        <div style="position: relative;">
+          <div id="popuptext"></div>
+          <div id="popupdrag"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="statsbackground"></div>
+    <div id="statswrap">
+      <div id="stats">
+        <div style="position: relative;">
+          <img id="statsclose" src="images/close.png" title="Close" alt="x" />
+          <div id="statstext"></div>
+          <div id="statsdrag"></div>
+        </div>
+      </div>
+    </div>
+
+    <p id="noscript">Note: This page will not function without JavaScript.</p>
+    <div id="refresh" style="display: none; color: #F7931A;">Refresh this page to start a new game.</div>
+
+    <div id="deed">
+      <div id="deed-normal" style="display: none;">
+        <div id="deed-header">
+          <div style="margin: 5px; font-size: 11px;">T I T L E&nbsp;&nbsp;D E E D</div>
+          <div id="deed-name"></div>
+        </div>
+        <table id="deed-table">
+          <tr><td colspan="2">RENT&nbsp;⚡₿<span id="deed-baserent">12</span>.</td></tr>
+          <tr><td style="text-align: left;">With 1 House</td><td style="text-align: right;">⚡₿&nbsp;&nbsp;&nbsp;<span id="deed-rent1">60</span>.</td></tr>
+          <tr><td style="text-align: left;">With 2 Houses</td><td style="text-align: right;"><span id="deed-rent2">180</span>.</td></tr>
+          <tr><td style="text-align: left;">With 3 Houses</td><td style="text-align: right;"><span id="deed-rent3">500</span>.</td></tr>
+          <tr><td style="text-align: left;">With 4 Houses</td><td style="text-align: right;"><span id="deed-rent4">700</span>.</td></tr>
+          <tr><td colspan="2"><div style="margin-bottom: 8px;">With HOTEL ⚡₿<span id="deed-rent5">900</span>.</div><div>Mortgage Value ⚡₿<span id="deed-mortgage">80</span>.</div><div>Houses cost ⚡₿<span id="deed-houseprice">100</span>. each</div><div>Hotels, ⚡₿<span id="deed-hotelprice">100</span>. plus 4 houses</div><div style="font-size: 9px; font-style: italic; margin-top: 5px;">If a player owns ALL the Lots of any Color-Group, the rent is Doubled on Unimproved Lots in that group.</div></td></tr>
+        </table>
+      </div>
+      <div id="deed-mortgaged">
+        <div id="deed-mortgaged-name"></div><p>&bull;</p><div>MORTGAGED</div><div> for ⚡₿<span id="deed-mortgaged-mortgage">80</span></div><p>&bull;</p><div style="font-style: italic; font-size: 13px; margin: 10px;">Card must be turned this side up if property is mortgaged</div>
+      </div>
+      <div id="deed-special">
+        <div id="deed-special-name"></div><div id="deed-special-text"></div>
+        <div id="deed-special-footer">Mortgage Value<span style="float: right;">⚡₿<span id="deed-special-mortgage">100</span>.</span></div>
+      </div>
+    </div>
+
+    <table id="board">
+      <tr>
+        <td class="cell board-corner" id="cell20"></td>
+        <td class="cell board-top" id="cell21"></td><td class="cell board-top" id="cell22"></td><td class="cell board-top" id="cell23"></td><td class="cell board-top" id="cell24"></td><td class="cell board-top" id="cell25"></td><td class="cell board-top" id="cell26"></td><td class="cell board-top" id="cell27"></td><td class="cell board-top" id="cell28"></td><td class="cell board-top" id="cell29"></td>
+        <td class="cell board-corner" id="cell30"></td>
+      </tr>
+      <tr><td class="cell board-left" id="cell19"></td><td colspan="9" class="board-center"></td><td class="cell board-right" id="cell31"></td></tr>
+      <tr><td class="cell board-left" id="cell18"></td><td colspan="9" class="board-center"></td><td class="cell board-right" id="cell32"></td></tr>
+      <tr><td class="cell board-left" id="cell17"></td><td colspan="9" class="board-center"></td><td class="cell board-right" id="cell33"></td></tr>
+      <tr><td class="cell board-left" id="cell16"></td><td colspan="9" class="board-center"></td><td class="cell board-right" id="cell34"></td></tr>
+      <tr><td class="cell board-left" id="cell15"></td><td colspan="9" class="board-center"></td><td class="cell board-right" id="cell35"></td></tr>
+      <tr><td class="cell board-left" id="cell14"></td><td colspan="9" class="board-center"></td><td class="cell board-right" id="cell36"></td></tr>
+      <tr><td class="cell board-left" id="cell13"></td><td colspan="9" class="board-center"></td><td class="cell board-right" id="cell37"></td></tr>
+      <tr><td class="cell board-left" id="cell12"></td><td colspan="9" class="board-center"></td><td class="cell board-right" id="cell38"></td></tr>
+      <tr><td class="cell board-left" id="cell11"></td><td colspan="9" class="board-center"><div id="jail"></div></td><td class="cell board-right" id="cell39"></td></tr>
+      <tr>
+        <td class="cell board-corner" id="cell10"></td>
+        <td class="cell board-bottom" id="cell9"></td><td class="cell board-bottom" id="cell8"></td><td class="cell board-bottom" id="cell7"></td><td class="cell board-bottom" id="cell6"></td><td class="cell board-bottom" id="cell5"></td><td class="cell board-bottom" id="cell4"></td><td class="cell board-bottom" id="cell3"></td><td class="cell board-bottom" id="cell2"></td><td class="cell board-bottom" id="cell1"></td>
+        <td class="cell board-corner" id="cell0"></td>
+      </tr>
+    </table>
+
+    <div id="moneybarwrap">
+      <div id="moneybar">
+        <table>
+          <tr id="moneybarrow1" class="money-bar-row"><td class="moneybararrowcell"><img src="images/arrow.png" id="p1arrow" class="money-bar-arrow" alt=">"/></td><td id="p1moneybar" class="moneybarcell"><div><span id="p1moneyname" >Player 1</span>:</div><div>⚡₿<span id="p1money">1500</span></div></td></tr>
+          <tr id="moneybarrow2" class="money-bar-row"><td class="moneybararrowcell"><img src="images/arrow.png" id="p2arrow" class="money-bar-arrow" alt=">" /></td><td id="p2moneybar" class="moneybarcell"><div><span id="p2moneyname" >Player 2</span>:</div><div>⚡₿<span id="p2money">1500</span></div></td></tr>
+          <tr id="moneybarrow3" class="money-bar-row"><td class="moneybararrowcell"><img src="images/arrow.png" id="p3arrow" class="money-bar-arrow" alt=">" /></td><td id="p3moneybar" class="moneybarcell"><div><span id="p3moneyname" >Player 3</span>:</div><div>⚡₿<span id="p3money">1500</span></div></td></tr>
+          <tr id="moneybarrow4" class="money-bar-row"><td class="moneybararrowcell"><img src="images/arrow.png" id="p4arrow" class="money-bar-arrow" alt=">" /></td><td id="p4moneybar" class="moneybarcell"><div><span id="p4moneyname" >Player 4</span>:</div><div>⚡₿<span id="p4money">1500</span></div></td></tr>
+          <tr id="moneybarrow5" class="money-bar-row"><td class="moneybararrowcell"><img src="images/arrow.png" id="p5arrow" class="money-bar-arrow" alt=">" /></td><td id="p5moneybar" class="moneybarcell"><div><span id="p5moneyname" >Player 5</span>:</div><div>⚡₿<span id="p5money">1500</span></div></td></tr>
+          <tr id="moneybarrow6" class="money-bar-row"><td class="moneybararrowcell"><img src="images/arrow.png" id="p6arrow" class="money-bar-arrow" alt=">" /></td><td id="p6moneybar" class="moneybarcell"><div><span id="p6moneyname" >Player 6</span>:</div><div>⚡₿<span id="p6money">1500</span></div></td></tr>
+          <tr id="moneybarrow7" class="money-bar-row"><td class="moneybararrowcell"><img src="images/arrow.png" id="p7arrow" class="money-bar-arrow" alt=">" /></td><td id="p7moneybar" class="moneybarcell"><div><span id="p7moneyname" >Player 7</span>:</div><div>⚡₿<span id="p7money">1500</span></div></td></tr>
+          <tr id="moneybarrow8" class="money-bar-row"><td class="moneybararrowcell"><img src="images/arrow.png" id="p8arrow" class="money-bar-arrow" alt=">" /></td><td id="p8moneybar" class="moneybarcell"><div><span id="p8moneyname" >Player 8</span>:</div><div>⚡₿<span id="p8money">1500</span></div></td></tr>
+          <tr id="moneybarrowbutton"><td class="moneybararrowcell">&nbsp;</td><td style="border: none;"><input type="button" id="viewstats" value="View stats" title="View a pop-up window that shows a list of each player's properties." /></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div id="setup" style="display:block">
+          
+    
+<div class="lobby-card">
+    <div class="lobby-title">⚡ Game Setup</div>
+
+    <!-- 1. MODE SELECTION -->
+    <div id="multiplayer-menu" style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #444;">
+        <p style="color:#aaa; font-size:0.9em; margin-bottom:10px;">Select Mode:</p>
+        <div style="display: flex; gap: 5px;">
+            <button id="btn-local-game" style="flex: 1; padding: 12px; background: #9C27B0; border: none; color: white; font-size: 0.9em; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                🤖 vs Bot
+            </button>
+            <button id="btn-host-game" style="flex: 1; padding: 12px; background: #4CAF50; border: none; color: white; font-size: 0.9em; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                🏠 Host
+            </button>
+            <button id="btn-join-game" style="flex: 1; padding: 12px; background: #2196F3; border: none; color: white; font-size: 0.9em; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                🔗 Join
+            </button>
+        </div>
+    </div>
+
+    <!-- 2. HOST PANEL -->
+    <div id="host-panel" style="display:none; background: #333; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ff9900;">
+        <p style="color: #ff9900; margin: 0 0 10px 0; font-weight: bold;">Game ID:</p>
+        
+        <!-- NEW: Toggle between New vs Resume -->
+        <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+            <button id="btn-host-new" style="flex:1; padding:6px; background:#4CAF50; border:none; color:white; border-radius:4px; cursor:pointer; font-size:0.85em;">
+                🆕 New Game
+            </button>
+            <button id="btn-host-resume" style="flex:1; padding:6px; background:#9C27B0; border:none; color:white; border-radius:4; cursor:pointer; font-size:0.85em;">
+                🔁 Resume Game
+            </button>
+        </div>
+
+        <!-- Input for existing Game ID (hidden by default) -->
+        <div id="resume-input-section" style="display:none; margin-bottom:10px;">
+            <input type="text" id="host-resume-input" placeholder="Enter existing Game ID" style="width:100%; padding:8px; border-radius:4px; border:1px solid #555; background:#222; color:white; font-family:monospace; font-size:1em;" maxlength="8">
+        </div>
+
+        <!-- Game ID Display -->
+        <div id="game-id-display" style="font-family: monospace; font-size: 1.4em; background: #000; padding: 10px; border-radius: 5px; word-break: break-all; color: #fff;">—</div>
+        <p id="host-instructions" style="color: #aaa; font-size: 0.8em; margin-top: 5px;">Generating new game...</p>
+        
+        <!-- Player List -->
+        <p style="color: #aaa; font-size: 0.9em; margin-top: 15px; border-bottom: 1px solid #555; padding-bottom: 5px;">Lobby Members:</p>
+        <ul id="lobby-player-list" style="list-style: none; padding: 0; margin: 0; color: white; font-size: 0.9em;">
+            <!-- Players will appear here dynamically -->
+        </ul>
+    </div>
+
+    <!-- 3. JOIN PANEL -->
+    <div id="join-panel" style="display:none; margin-bottom: 20px;">
+        <p style="color:#aaa; font-size:0.9em; margin-bottom:5px;">Paste Game ID:</p>
+        <div style="display: flex; gap: 5px;">
+            <input type="text" id="join-game-input" placeholder="npub... or hex..." style="flex:1; padding:10px; border-radius:5px; border:1px solid #555; background:#222; color:white;">
+            <button id="btn-connect-join" style="padding:10px 20px; background:#ff9900; border:none; color:white; border-radius:5px; cursor:pointer; font-weight:bold;">Connect</button>
+        </div>
+        
+        <!-- Player List -->
+        <p style="color: #aaa; font-size: 0.9em; margin-top: 15px; border-bottom: 1px solid #555; padding-bottom: 5px;">Lobby Members:</p>
+        <ul id="lobby-player-list" style="list-style: none; padding: 0; margin: 0; color: white; font-size: 0.9em;">
+            <!-- Players will appear here dynamically -->
+        </ul>
+    </div>
+
+    <!-- 4. PLAYER 1 CONFIG (Always You) -->
+    <div id="player1input" class="player-input" style="display:block; border-left: 5px solid yellow;">
+        <label style="font-size:0.8em; color:#aaa;">Your Name</label>
+        <input type="text" id="player1name" maxlength="16" value="Player 1" />
+        <div style="display:flex; gap:10px;">
+            <select id="player1color" style="flex:1;" onchange="handleColorChange(1)">
+                <option style="color: yellow;" selected>Yellow</option>
+                <option style="color: blue;">Blue</option>
+                <option style="color: red;">Red</option>
+                <option style="color: lime;">Lime</option>
+                <option style="color: green;">Green</option>
+                <option style="color: aqua;">Aqua</option>
+                <option style="color: orange;">Orange</option>
+                <option style="color: purple;">Purple</option>
+            </select>
+            <!-- Hidden AI selector for Player 1 (Must exist for setup() to work) -->
+            <select id="player1ai" style="display:none;"><option value="0">Human</option></select>
+        </div>
+    </div>
+    <!-- Cashu Wallet Section -->
+    <div class="wallet-section" style="margin-top: 20px; padding: 15px; border: 1px solid #4a5568; border-radius: 8px; background-color: #2d3748;">
+        <h3 style="margin-top: 0; color: #fbbf24;">💰 Cashu Wallet</h3>
+        
+        <div style="margin-bottom: 15px;">
+            <label for="mint-select" style="display: block; margin-bottom: 5px; color: #e2e8f0;">Select Mint:</label>
+            <select id="mint-select" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #4a5568; background-color: #4a5568; color: white;">
+                <!-- Options will be populated by JavaScript -->
+            </select>
+            <input type="text" id="custom-mint-url" placeholder="Enter custom mint URL" 
+                  style="width: 100%; padding: 8px; margin-top: 8px; border-radius: 4px; border: 1px solid #4a5568; background-color: #4a5568; color: white; display: none;">
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <button id="btn-connect-mint" style="width: 100%; padding: 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                Connect to Mint
+            </button>
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <label for="mint-amount" style="display: block; margin-bottom: 5px; color: #e2e8f0;">Amount to Mint (min 500 sats):</label>
+            <div style="display: flex; gap: 10px;">
+                <input type="number" id="mint-amount" min="500" value="500"
+                      style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #4a5568; background-color: #4a5568; color: white;">
+                <button id="btn-mint-tokens" style="padding: 8px 15px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                    Mint
+                </button>
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <div id="cashu-balance" style="padding: 8px; background-color: #4a5568; border-radius: 4px; font-weight: bold; color: #fbbf24;">
+                Balance: 0 sats
+            </div>
+        </div>
+        
+        <div>
+            <button id="btn-cash-out" style="width: 100%; padding: 10px; background: #f97316; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                Cash Out Token
+            </button>
+        </div>
+    </div>
+
+    <!-- 5. HIDDEN/AUTOMATED INPUTS FOR ENGINE -->
+    <div style="display:none;">
+        <input type="hidden" id="playernumber" value="2">
+        <div id="visible-player-count">2</div>
+        
+        <!-- PLAYER 2 CONFIG (Hidden but strictly required by monopoly.js) -->
+        <div id="player2input">
+            <input type="text" id="player2name" value="Opponent">
+            <select id="player2color"><option value="Blue">Blue</option></select>
+            <!-- THIS WAS MISSING BEFORE! The ID 'player2ai' is critical. -->
+            <select id="player2ai">
+                <option value="0" id="p2-human-option">Human</option>
+                <option value="1" id="p2-bot-option">AI</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- 6. START BUTTON -->
+    <input type="button" value="START GAME" id="btn-start-game" class="start-btn" style="display:none;" />
+
+    <div class="disclaimer-box">
+        <span class="disclaimer-title">⚠️ Network Status</span>
+        <span id="network-status">Select a mode above.</span>
+    </div>
+</div>
+
+  
+
+  
+        
+        <!-- IMPORTANT: The onclick="setup()" has been removed. We attach this in main.ts -->
+         <!--  <input type="button" value="START GAME" id="btn-start-game" class="start-btn" /> -->
+
+        <div class="disclaimer-box"><span class="disclaimer-title">⚠️ Important Warning</span>Do not refresh the page during gameplay or you will lose your game state.<br><br>Funds are held locally on this device.</div>
+      </div>
+    </div>
+
+    <div id="control">
+      <table>
+        <tr>
+          <td style="text-align: left; vertical-align: top; border: none;">
+            <div id="menu">
+              <table id="menutable" cellspacing="0">
+                <tr>
+                  <td class="menu-item" id="buy-menu-item"><a href="javascript:void(0);" title="View alerts and buy the property you landed on.">Buy</a></td>
+                  <td class="menu-item" id="manage-menu-item"><a href="javascript:void(0);" title="View, mortgage, and improve your property. ">Manage</a></td>
+                  <td class="menu-item" id="trade-menu-item"><a href="javascript:void(0);" title="Exchange property with other players.">Trade</a></td>
+                </tr>
+              </table>
+            </div>
+            <div id="buy"><div id="alert"></div><div id="landed"></div></div>
+            <div id="manage">
+              <div id="option">
+                <div id="buildings" title="Available buildings"></div>
+                <input type="button" value="Buy house" id="buyhousebutton"/><input type="button" value="Mortgage" id="mortgagebutton" /><input type="button" value="Sell house" id="sellhousebutton"/>
+              </div>
+              <div id="owned"></div>
+            </div>
+          </td>
+          <td style="vertical-align: top; border: none;">
+            <div id="quickstats" style=""><div><span id="pname" >Player 1</span>:</div><div><span id="pmoney">⚡₿1500</span></div></div>
+            <div><div id="die0" title="Die" class="die die-no-img"></div><div id="die1" title="Die" class="die die-no-img"></div></div>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="2" style="border: none">
+            <div style="padding-top: 8px;">
+              <input type="button" id="nextbutton" title="Roll the dice and move your token accordingly." value="Roll Dice"/>
+              <input type="button" id="resignbutton" title="If you cannot pay your debt then you must resign from the game." value="Resign" />
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <div id="trade">
+      <table style="border-spacing: 3px;">
+        <tr><td class="trade-cell"><div id="trade-leftp-name"></div></td><td class="trade-cell"><div id="trade-rightp-name"></div></td></tr>
+        <tr><td class="trade-cell">$&nbsp;<input id="trade-leftp-money" value="0" title="Enter amount to exchange with the other player." /></td><td class="trade-cell">$&nbsp;<input id="trade-rightp-money" value="0" title="Enter amount to exchange with the other player." /></td></tr>
+        <tr><td id="trade-leftp-property" class="trade-cell"></td><td id="trade-rightp-property" class="trade-cell"></td></tr>
+        <tr>
+          <td colspan="2" class="trade-cell">
+            <!-- Onclick handlers removed, re-attach in JS -->
+            <input type="button" id="proposetradebutton" value="Propose Trade" title="Exchange the money and properties that are checked above." />
+            <input type="button" id="canceltradebutton" value="Cancel Trade" title="Cancel the trade." />
+            <input type="button" id="accepttradebutton" value="Accept Trade" title="Accept the proposed trade." />
+            <input type="button" id="rejecttradebutton" value="Reject Trade" title="Reject the proposed trade." />
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- ================= CASHOUT MODAL START ================= -->
+    <div id="cashout-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:100000; align-items:center; justify-content:center; flex-direction:column; text-align:center; font-family:sans-serif;">
+          
+<h1 id="cashout-title" style="color: #4CAF50; font-size: 2.5em; margin: 0 0 20px 0;">🎉 YOU WON! 🎉</h1>
+      <p style="color: white; font-size: 1.2em;">Here is your Cashu Token:</p>
+      <textarea id="token-display" readonly style="width: 90%; max-width: 500px; height: 150px; padding: 15px; border-radius: 10px; border: 2px solid #4CAF50; background: #222; color: #0f0; font-family: monospace; font-size: 14px; resize: none; word-break: break-all;"></textarea>
+      <div style="margin-top: 20px; display: flex; gap: 15px;">
+          <button id="copy-btn" style="padding: 15px 30px; font-size: 1.2em; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">📋 Copy Token</button>
+          <button id="new-game-btn" onclick="location.reload()" style="padding: 15px 30px; font-size: 1.2em; background: #444; color: white; border: none; border-radius: 8px; cursor: pointer;">🔄 New Game</button>
+      </div>
+      <p style="color: #888; margin-top: 20px; font-size: 0.9em;">Paste this token into your wallet (e.g. Minibits/Cashu.me) to claim funds.</p>
+    </div>
+    <!-- ================= CASHOUT MODAL END ================= -->
+
+    <!-- VITE ENTRY POINT -->
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

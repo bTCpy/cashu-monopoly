@@ -1,0 +1,1138 @@
+body {
+	background: #121212;
+	margin: 0px;
+	min-width: 1075px;
+	font-family: 'Segoe UI', 'Roboto', Helvetica, Arial, sans-serif;
+}
+
+td {
+	font-size: 11px;
+	font-weight: bold;
+	font-family: arial, sans-serif;
+	border: 1px solid #333;
+	background-color: #1e1e1e; 
+	color: #ffba71;
+	text-align: center;
+}
+
+#setup {
+	display: none;
+	margin: 15px;
+	color: #F7931A;
+}
+
+#moneybar {
+	float: right;
+	border: 0px #F7931A;
+	background-color: #F7931A;
+	margin: 15px;
+	border-radius: 5px;
+	display: none;
+	z-index: 14;
+	position: relative;
+	cursor: default;
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+#moneybar table {
+	font-weight: bold;
+	border-spacing: 1px;
+}
+
+#moneybarwrap {
+    position: absolute;
+    top: 10px;       /* Give it a little spacing from top */
+    right: 10px;     /* Initial position */
+    width: auto;     /* Let it grow with content */
+    min-width: 135px;
+    z-index: 2000;   /* Ensure it floats above everything */
+    
+    /* Make it look interactive */
+    cursor: move;    
+    -webkit-user-select: none;
+    user-select: none;
+    
+    /* Optional: Add a shadow so it pops out */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
+    border-radius: 5px;
+}
+
+#propertystats {
+	margin-right: 110px;
+}
+
+#refresh {
+	display: none;
+	margin: 15px;
+}
+
+#noF5 {
+	display: none;
+}
+
+#noscript {
+	margin-left: 10px;
+}
+
+#board {
+	display: none;
+	border: 2px solid black;
+	border-spacing: 3px;
+	margin: 25px;
+	float: left;
+	overflow: auto;
+}
+
+#board-container {
+  height: 100vh;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch; /* Important for iOS, but good for Android too */
+}
+
+#jail {
+	border: 1px solid black;
+	height: 65px;
+	width: 65px;
+	position: relative;
+	top: 73px;
+	left: -73px;
+	z-index: 2;
+}
+
+
+#control {
+	position: absolute;
+	z-index: 9;
+	top: 250px;
+	left: 250px;
+	border: 2px solid #957231;
+	padding: 10px;
+	display: none;
+	background-color: #1e1e1e;
+}
+
+#quickstats {
+	font-size: 12px;
+	font-weight: bold;
+	font-family: arial, sans-serif;
+	border: 2px solid blue;
+	margin: 5px;
+	padding: 3px;
+	width: 80px;
+}
+
+#pname {
+	background-color: #1e1e1e;
+}
+
+#landed {
+	padding: 3px;
+	border: 1px #F7931A;
+	border-top: none;
+	width: 302px;
+
+	margin: 0px;
+	text-align: center;
+}
+
+#alert {
+	width: 307px;
+	height: 92px;
+	margin: 0px;
+	padding-left: 1px;
+	border: 1px solid #F7931A;
+	font-family: Consolas, "Courier New", monospace;
+	font-size: 13px;
+	background-color: #000;
+	overflow-y: scroll;
+	overflow-x: hidden;
+	line-height: 1.4em; 
+}
+
+#alert div {
+	margin-bottom: 5px;       /* Spacing between messages */
+	white-space: normal;      /* CRITICAL: Allows text to wrap to the next line */
+	word-wrap: break-word;    /* CRITICAL: Breaks very long numbers if they don't fit */
+    	overflow-wrap: break-word; /* Modern standard for the above */
+}
+
+#manage {
+	width: 308px;
+	border: 1px #F7931A;
+	display: none;
+	background-color: #1e1e1e;
+}
+
+#option {
+	border-bottom: 1px solid gray;
+	background-color: #1e1e1e;
+	display: none;
+	background: #1e1e1e;
+	vertical-align: middle;
+	padding: 3px;
+	text-align: center;
+	min-height: 26px;
+}
+
+#buildings {
+	margin: auto;
+	height: 21px;
+	font-size: 16px;
+	font-weight: bold;
+}
+
+#buildings .house {
+	width: 25px;
+	height: 19px;
+	vertical-align: top;
+	float: none;
+}
+
+#buildings .hotel {
+	width: 26px;
+	height: 19px;
+	vertical-align: top;
+	float: none;
+}
+
+#owned {
+	padding: 3px 0px;
+	background-color: #1e1e1e;
+	text-align: center;
+	max-height: 390px;
+	overflow-y: auto;
+}
+
+#owned .propertycellname {
+	vertical-align: top;
+}
+
+#property {
+	margin-right: 1px;
+	background: white;
+}
+
+#trade {
+	border: 2px solid black;
+	display: none;
+	width: 630px;
+	margin: 15px auto;
+	background-color: white;
+	border-radius: 8px;
+	padding: 2px;
+	z-index: 14;
+}
+
+#trade-leftp-name {
+	font-size: 13px;
+	font-weight: bold;
+}
+
+#trade-leftp-name option {
+	font-size: 13px;
+	font-weight: normal;
+}
+
+#trade-rightp-name {
+	font-size: 13px;
+	font-weight: bold;
+}
+
+#trade-rightp-name option {
+	font-size: 13px;
+	font-weight: normal;
+}
+
+#trade-leftp-money {
+	width: 90%;
+}
+
+#trade-rightp-money {
+	width: 90%;
+}
+
+#deedcolor {
+	background: white;
+	width: 100%;
+	height: 48px;
+}
+
+#deedname {
+	margin-top: 10px;
+	font-weight: bold;
+	font-size: 20px;
+	background-color: white;
+}
+
+#menu {
+	width: 290px;
+	height: 32px;
+	margin: 0px 10px;
+}
+
+#menutable {
+	padding: 0px;
+	text-align: left;
+	font-family: arial, sans-serif;
+	color: white;
+	font-weight: bold;
+	font-size: 16px;
+	border: 1px white;
+	border-radius: 5px 5px 0px 0px;
+	height: 30px;
+	width: 99%;
+	margin: 0px;
+	background-color: #305BC9;
+	/* background-image: -webkit-linear-gradient(bottom,#213EB2,#4787ED);
+	background-image: -moz-linear-gradient(bottom,#213EB2,#4787ED); */
+	background-image: url(/images/menu_background.png);
+	/* background-repeat: repeat-x; */
+	overflow: hidden;
+}
+
+#menutable td {
+	vertical-align: top;
+}
+
+#menu a {
+	color: #1e1e1e;
+	text-decoration: none;
+	display: block;
+	height: 100%;
+	width: 100%;
+	padding-top: 8px;
+	background-color: #F7931A;
+}
+
+#buy-menu-item {
+	color: #F7931A;
+	margin-left: 2px;
+	border-left: none;
+}
+
+#trade-menu-item {
+	color: #AAAAAA;
+	border-right: none;
+	margin-right: 2px;
+}
+
+
+#popup {
+	width: 300px;
+	min-width: 300px;
+	font-family: Arial, sans-serif;
+	font-size: 14px;
+	padding: 10px;
+	text-align: center;
+	word-wrap: break-word;
+	line-height: 1.5;
+	border: 2px solid black;
+	border-radius: 10px;
+	background-color: aliceblue; 
+	display: block;
+	z-index: 13;
+	margin: auto;
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+#popupwrap {
+	position: absolute;
+	top: 255px;
+	left: 0px;
+	width: 100%;
+	display: none;
+	background-color: transparent;
+	z-index: 13;
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+#popuptext {
+	overflow-x: auto;
+}
+
+/* #popupclose {
+	display: none;
+	position: absolute;
+	top: -24px;
+	right: -25px;
+	width: 30px;
+	height: 30px;
+	border: none;
+	cursor: pointer;
+	overflow: visible;
+	z-index: 12;
+} */
+
+#popupclose input {
+	margin: 0px;
+	background-color: red;
+	height: 18px;
+	width: 18px;
+	padding: 0px;
+}
+
+#popupbackground {
+	position: fixed;
+	width: 100%;
+	height: 100%;
+	top: 0px;
+	left: 0px;
+	background-color: #000000;
+	opacity: 0.5;
+	display: none;
+	z-index: 10;
+}
+
+#popupdrag {
+	width: 100%;
+	height: 16px;
+	position: absolute;
+	top: -16px;
+	cursor: move;
+}
+
+#stats {
+	max-width: 914px;
+	min-width: 454px;
+	font-family: Arial, sans-serif;
+	font-size: 14px;
+	padding: 10px;
+	text-align: center;
+	word-wrap: break-word;
+	line-height: 1.5;
+	border: 2px solid black;
+	border-radius: 10px;
+	background-color: white;
+	display: block;
+	z-index: 17;
+	margin: auto;
+	position: relative;
+	top: 0px;
+	left: 0px;
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+#statswrap {
+	position: absolute;
+	top: 250px;
+	left: 0px;
+	width: 100%;
+	display: none;
+	background-color: transparent;
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+#statstext {
+	overflow: hidden;
+	min-height: 70px;
+}
+
+#statsclose {
+	display: block;
+	position: absolute;
+	top: -24px;
+	right: -25px;
+	width: 30px;
+	height: 30px;
+	border: none;
+	cursor: pointer;
+	overflow: visible;
+	z-index: 17;
+}
+
+#statsbackground {
+	position: fixed;
+	width: 100%;
+	height: 100%;
+	top: 0px;
+	left: 0px;
+	background-color: #000000;
+	opacity: .5;
+	display: none;
+	z-index: 16;
+}
+
+#statsdrag {
+	width: 100%;
+	height: 16px;
+	position: absolute;
+	top: -16px;
+	cursor: move;
+}
+
+#deed {
+	display: none;
+	position: fixed;
+	border: 2px solid black;
+	width: 235px;
+	height: 275px;
+	background-color: white;
+	z-index: 18;
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+#deed td{
+	border: none;
+}
+
+#deed-header {
+	width: 215px;
+	height: 48px;
+	border: 1px solid black;
+	margin: 9px;
+	background-color: yellow;
+	text-align: center;
+	text-transform: uppercase;
+	font-family: Calibri, Arial;
+}
+
+#deed-name {
+	font-size: 15px;
+	font-weight: bold;
+
+}
+
+#deed-table {
+	margin: 9px;
+	width: 217px;
+	border-spacing: 1px;
+}
+
+#deed-mortgaged {
+	font-family: Calibri, Arial;
+	font-size: 16px;
+	text-align: center;
+
+}
+
+#deed-mortgaged-name {
+	font-size: 18px;
+	font-weight: bold;
+	text-transform: uppercase;
+	margin: 30px 20px 20px;
+}
+
+#deed-special {
+	font-family: Calibri, Arial;
+	text-align: justify;
+}
+
+#deed-special-name {
+	text-align: center;
+	font-size: 18px;
+	font-weight: bold;
+	border-style: solid;
+	border-width: 2px 0px;
+	text-transform: uppercase;
+	margin: 50px 20px 20px;
+}
+
+#deed-special-text {
+	margin: 20px;
+	font-size: 15px;
+}
+
+#deed-special-footer {
+	margin: 0px 20px;
+	width: 195px;
+	position: absolute;
+	bottom: 20px;
+	font-size: 16px;
+}
+
+#enlarge-wrap {
+	border: none;
+	z-index: 0;
+}
+
+.menu-item:hover {
+	/* background-image: -webkit-linear-gradient(bottom,#000080,#4787ED);
+	background-image: -moz-linear-gradient(bottom,#000080,#4787ED); */
+
+	background-image: url(/images/menu_background_hover.png);
+}
+
+.menu-item {
+	padding: 0px;
+	border-collapse: collapse;
+	text-align: center;
+	display: table-cell;
+	background-color: transparent;
+	border: none;
+	border-right: 2px solid white;
+	height: 30px;
+	min-width: 90px;
+	width: 90px;
+	max-width: 90px;
+	overflow: hidden;
+}
+
+.die {
+	display: none;
+	margin: 5px;
+	float: left;
+}
+
+.die-no-img {
+
+
+	border-radius: 6px;
+	font-weight: bold;
+	border: 2px solid black;
+	padding: 5px 10px;
+}
+.house {
+	width: 25px;
+	height: 19px;
+	vertical-align: middle;
+	float: right;
+}
+
+.hotel {
+	width: 26px;
+	height: 19px;
+	vertical-align: middle;
+	float: right;
+}
+
+.cell {
+	position: relative;
+	top: 0px;
+	left: 0px;
+	padding: 0px;
+	vertical-align: bottom;
+	background-repeat: no-repeat;
+	background-size: auto 40px;
+}
+
+.board-center {
+	width: 675px;
+	border: none;
+	vertical-align: bottom;
+	background-repeat: no-repeat;
+	background-size: auto 40px;
+}
+
+.board-corner {
+	width: 102px;
+	height: 102px;
+}
+
+.board-top {
+	width: 72px;
+	height: 102px;
+}
+
+.board-bottom {
+	width: 72px;
+	height: 102px;
+}
+
+.board-left {
+	width: 102px;
+	height: 72px;
+}
+
+.board-right {
+	width: 102px;
+	height: 72px;
+}
+
+.enlarge {
+	width: 150px;
+	height: 200px;
+	display: none;
+	background-color: white;
+	border: 2px solid black;
+	text-align: center;
+	font-size: 12px;
+	font-family: arial, sans-serif;
+	position: fixed;
+	z-index: 15;
+}
+
+.enlarge-color {
+	background: white;
+	width: 100%;
+	height: 40px;
+}
+
+.enlarge-name {
+	font-weight: bold;
+	font-size: 20px;
+	background-color: white;
+	height: 45px;
+}
+
+.enlarge-price {
+	background-color: white;
+	vertical-align: bottom;
+	height: 25px;
+}
+
+.enlarge-token {
+	height: 45px;
+	width: 150px;
+}
+
+.moneybarcell {
+	width: 83px;
+	min-width: 83px;
+}
+
+.moneybararrowcell {
+	background: white;
+	width: 30px;
+	border: none;
+	text-align: right;
+	padding: 0px;
+}
+
+.money-bar-arrow {
+	height: 30px;
+	width: 30px;
+}
+.propertycellcheckbox {
+	width: 20px;
+	height: 20px;
+	border: none;
+	vertical-align: middle;
+}
+
+.propertycellcolor {
+	padding: 0px;
+	width: 20px;
+	height: 20px;
+	border-width: 1px;
+	border-style: solid;
+	border-color: white;
+}
+
+.propertycellname {
+	height: 20px;
+	width: 250px;
+	border: none;
+	cursor: default;
+	text-align: left;
+	vertical-align: middle;
+}
+
+.propertycelldeed {
+	width: 18px;
+	height: 20px;
+	border: 1px solid grey;
+	cursor: pointer;
+	display: none;
+}
+
+.statscellcolor {
+	padding: 0px;
+	width: 22px;
+	height: 20px;
+	border: none;
+	color: #3da4ff;
+}
+
+.statscellname {
+	height: 20px;
+	border: none;
+	cursor: default;
+	text-align: left;
+	min-width: 172px;
+}
+
+.statsplayername {
+	font-weight: bold;
+	font-size: 24px;
+}
+
+.statscell {
+	border: 2px solid black;
+	padding: 8px;
+	vertical-align: top;
+	width: 202px;
+	min-width: 115px;
+}
+
+.trade-cell {
+	border: none;
+	border-radius: 3px;
+	width: 308px;
+	height: 26px;
+	vertical-align: middle;
+}
+
+.cell-anchor {
+	width: 100%;
+	height: 100%;
+	position: relative;
+	bottom: 0px;
+	left: 0px;
+}
+
+.cell-name {
+	position: absolute;
+	bottom: 0px;
+	left: 0px;
+	text-align: center;
+	width: 100%;
+}
+
+.cell-position-holder {
+	width: 100%;
+	height: 100%;
+	z-index: 1;
+	position: relative;
+}
+
+.cell-position {
+	height: 12px;
+	width: 12px;
+	position: absolute;
+	top: 0px;
+	left: 0px;
+}
+
+.cell-owner {
+	background-size: cover;
+	display: none;
+	position: absolute;
+}
+
+.board-top .cell-owner {
+	background-image: url("/images/hori-bar.png");
+
+	height: 15px;
+	left: 0px;
+
+
+
+	top: -25px;
+	width: 72px;
+
+}
+
+.board-bottom .cell-owner {
+	background-image: url("/images/hori-bar.png");
+	bottom: -25px;
+
+	height: 15px;
+
+
+
+
+	left: 0px;
+	width: 72px;
+}
+
+.board-left .cell-owner {
+	background-image: url("/images/vert-bar.png");
+
+	height: 68px;
+	left: -25px;
+
+
+
+	top: 0px;
+	width: 15px;
+
+}
+
+.board-right .cell-owner {
+	background-image: url("/images/vert-bar.png");
+
+	height: 68px;
+	right: -25px;
+
+
+
+	top: 0px;
+	width: 15px;
+
+}
+
+/* --- FOOTER & SOCIAL ICONS --- */
+#social-footer {
+    margin-top: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 25px; /* Space between icons */
+}
+
+.social-icon {
+    width: 32px;
+    height: 32px;
+    fill: #666; /* Default gray color */
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+
+.social-icon:hover {
+    transform: scale(1.1); /* Grow slightly on hover */
+}
+
+
+a[href*="github.com"] .social-icon:hover {
+    fill: #ffffff; /* White on hover */
+}
+
+/* 1. Background & Centering */
+#setup {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; 
+    height: 100%;
+    background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%);
+    z-index: 9999;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    color: white;
+    
+    /* --- THE FIX START --- */
+    display: flex;
+    flex-direction: column;
+    align-items: center;      /* Center horizontally */
+    justify-content: flex-start; /* Start stacking from the top (Fixes the cutoff) */
+    overflow-y: auto;         /* Allow vertical scrolling */
+    padding: 40px 20px;       /* Add breathing room at top and bottom */
+    box-sizing: border-box;
+    /* --- THE FIX END --- */
+}
+
+/* 2. The Game Lobby Card */
+.lobby-card {
+    background: #2a2a2a;
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    border: 1px solid #444;
+    width: 100%;
+    max-width: 500px; /* Limits width on desktop */
+    text-align: center;
+    margin: auto;
+}
+
+/* 3. Titles and Labels */
+.lobby-title {
+    font-size: 2rem;
+    margin-bottom: 20px;
+    color: #ff9900; /* Bitcoin Orange */
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.lobby-label {
+    display: block;
+    text-align: left;
+    margin-top: 15px;
+    margin-bottom: 5px;
+    color: #aaa;
+    font-size: 0.9rem;
+}
+
+/* 4. Inputs & Selects */
+#playernumber, .player-input input, .player-input select {
+    width: 94%;
+    padding: 12px;
+    margin-bottom: 10px;
+    background: #1a1a1a;
+    border: 1px solid #444;
+    border-radius: 8px;
+    color: white;
+    font-size: 1rem;
+    outline: none;
+    transition: border 0.3s;
+}
+
+#playernumber:focus, .player-input input:focus, .player-input select:focus {
+    border-color: #ff9900;
+}
+
+/* 5. Player Rows Layout */
+.player-input {
+    display: none; /* JS toggles this */
+    background: #333;
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    text-align: left;
+    border-left: 5px solid #555; /* Default accent */
+}
+
+/* Color Coded Borders for Players (Optional Polish) */
+#player1input { border-left-color: yellow; }
+#player2input { border-left-color: blue; }
+#player3input { border-left-color: red; }
+#player4input { border-left-color: lime; }
+#player5input { border-left-color: green; }
+#player6input { border-left-color: aqua; }
+#player7input { border-left-color: orange; }
+#player8input { border-left-color: purple; }
+
+/* 6. The Start Button */
+.start-btn {
+    width: 100%;
+    padding: 15px;
+    margin-top: 20px;
+    background: #ff9900;
+    color: white;
+    font-size: 1.2rem;
+    font-weight: bold;
+    border: none;
+    border-radius: 50px; /* Pill shape */
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s;
+    box-shadow: 0 4px 15px rgba(255, 153, 0, 0.3);
+}
+
+.start-btn:hover {
+    background: #e68a00;
+    transform: translateY(-2px);
+}
+
+.start-btn:active {
+    transform: translateY(0);
+}
+
+/* 7. Disclaimer Box */
+.disclaimer-box {
+    margin-top: 25px;
+    background: rgba(255, 165, 0, 0.1);
+    border: 1px solid rgba(255, 165, 0, 0.3);
+    padding: 15px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: #ddd;
+    line-height: 1.4;
+    text-align: left;
+}
+
+.disclaimer-title {
+    color: #ff9900;
+    font-weight: bold;
+    display: block;
+    margin-bottom: 5px;
+}
+.stat-box {
+    background: #222;
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 15px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+}
+
+.stat-label {
+    color: #aaa;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.stat-value {
+    color: #ff9900; /* Bitcoin Orange */
+    font-size: 1.8rem;
+    font-weight: bold;
+    text-shadow: 0 0 10px rgba(255, 153, 0, 0.3);
+}
+
+@media only screen and (max-width: 1000px), only screen and (max-height: 900px) {
+
+    /* 1. Pin Control Panel to Bottom of Screen */
+    #control {
+        position: fixed; /* Pins to the "Glass" of the screen */
+        bottom: 10px;
+        left: 10px;
+        
+        width: fit-content;
+        height: fit-content;
+        max-width: 100%; 
+        
+ 
+        border: 2px solid #ff9900; /* Nice orange accent */
+        border-radius: 12px; /* Rounded corners look better for floating widgets */
+        z-index: 5000; /* Ensure it sits ON TOP of everything */
+        
+        /* Layout adjustments for the panel content */
+        display: flex;
+        flex-direction: column;
+        padding: 10px;
+        /*box-sizing: border-box; */
+        box-shadow: 0 -5px 15px rgba(0,0,0,0.5);
+        
+         /* User Interaction settings */
+        touch-action: none; /* Critical: Prevents browser scrolling when touching this */
+        user-select: none;
+    }
+
+    /* 2. Create Space at Bottom of Page */
+    /* This is CRITICAL. Without this, the Control Panel will cover 
+       the bottom row (Jail, Light Blue, etc.) and you won't be able 
+       to see them. */
+    body {
+        padding-bottom: 200px; /* Adjust this number based on how tall your panel is */
+    }
+
+    /* 3. Tweak the internal layout of controls for mobile */
+    #control table {
+        width: 100%;
+    }
+    
+    /* Limit the height of the alert box so the panel doesn't take up the whole screen */
+    #alert {
+        height: 80px; 
+        font-size: 13px;
+    }
+}
+
+#popupbackground {
+        z-index: 6000 !important;
+        /* Add these to ensure full screen coverage on mobile */
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+#popupwrap {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        
+        /* Flexbox centering */
+        display: none; /* JS toggles this to flex */
+        align-items: center;
+        justify-content: center;
+        z-index: 6001 !important;
+    }
+
+    #popup {
+        position: relative !important;
+        top: auto !important;
+        left: auto !important;
+        margin: 0 !important;
+        
+        /* Ensure it fits on small screens */
+        max-width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+
+#control, #moneybarwrap, #popup {
+  touch-action: none; /* Critical for Android */
+  user-select: none;  /* Prevent text selection during drag */
+}
+
