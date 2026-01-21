@@ -725,7 +725,7 @@ function Game() {
 		return trade;
 	};
 
-	var writeTrade = function(tradeObj) {
+	window.writeTrade = function(tradeObj) {
 		resetTrade(tradeObj.getInitiator(), tradeObj.getRecipient(), false);
 
 		for (var i = 0; i < 40; i++) {
@@ -807,9 +807,43 @@ function Game() {
 			resetTrade(initiator, recipient, true);
 		}
 	};
+	
+	
+	this.openRemoteTrade = function(tradeObj) {
+		// Call the private writeTrade function
+		writeTrade(tradeObj);
+		
+		// Save global state
+		window.currentActiveTrade = tradeObj;
+		
+		// Update UI
+		$("#proposetradebutton, #canceltradebutton").hide();
+		$("#accepttradebutton").show();
+		$("#rejecttradebutton").show();
+		
+		$("#trade").show();
+		$("#board").hide();
+		$("#control").hide();
+	};
 
 
 	this.cancelTrade = function() {
+		// P2P INTERCEPTION
+		if (!window.isExecutingRemote && window.nostrManager && window.nostrManager.gameId) {
+		    var myIndex = window.MY_PLAYER_INDEX || 1;
+
+		    // CASE A: JOINER -> Send Action
+		    if (myIndex !== 1) {
+		        window.nostrManager.sendAction('TRADE_CANCEL');
+		        return;
+		    }
+		    
+		    // CASE B: HOST -> Execute Locally
+		    // Fall through to standard logic below, but ensure we broadcast at the end.
+		    // (We set a flag to trigger broadcast after the DOM updates)
+		    var shouldBroadcast = true;
+		}
+		
 		$("#board").show();
 		$("#control").show();
 		$("#trade").hide();
@@ -819,10 +853,32 @@ function Game() {
 			player[turn].AI.alertList = "";
 			game.next();
 		}
+		
+		window.currentActiveTrade = null;
+		
+		// Broadcast if Host
+		if (shouldBroadcast && window.broadcastGameState) {
+		    window.broadcastGameState();
+		}
 
 	};
 
 	this.acceptTrade = function(tradeObj) {
+		// P2P INTERCEPTION
+		if (!window.isExecutingRemote && window.nostrManager && window.nostrManager.gameId) {
+		    var myIndex = window.MY_PLAYER_INDEX || 1;
+
+		    // CASE A: JOINER -> Send Action
+		    if (myIndex !== 1) {
+		        window.nostrManager.sendAction('TRADE_ACCEPT');
+		        return;
+		    }
+		    
+		    // CASE B: HOST -> Execute Locally
+		    // Fall through to standard logic.
+		    var shouldBroadcast = true;
+		}
+		
 		if (isNaN(document.getElementById("trade-leftp-money").value)) {
 			document.getElementById("trade-leftp-money").value = "This value must be a number.";
 			document.getElementById("trade-leftp-money").style.color = "red";
@@ -940,10 +996,66 @@ function Game() {
 			player[turn].AI.alertList = "";
 			game.next();
 		}
-		if(window.broadcastGameState) window.broadcastGameState();
+		
+		// Clear Global
+		window.currentActiveTrade = null;
+
+		// Broadcast Result
+		if (shouldBroadcast && window.broadcastGameState) {
+		    window.broadcastGameState();
+		}
 	};
 
 	this.proposeTrade = function() {
+		console.log("Propose Trade Clicked..."); // Debug Log
+		
+		// P2P INTERCEPTION
+		if (!window.isExecutingRemote && window.nostrManager && window.nostrManager.gameId) {
+		    
+		    // 1. Validate Inputs
+		    if (isNaN(document.getElementById("trade-leftp-money").value) || 
+		        isNaN(document.getElementById("trade-rightp-money").value)) {
+		        return; 
+		    }
+
+		    var myIndex = window.MY_PLAYER_INDEX || 1;
+
+		    // --- CASE A: JOINER (Player 2+) ---
+		    // Send request to Host and stop.
+		    if (myIndex !== 1) {
+		        try {
+		            var localTrade = readTrade();
+		            var payload = window.serializeTrade(localTrade);
+		            window.nostrManager.sendAction('TRADE_PROPOSE', payload);
+		        } catch(e) { console.error(e); }
+		        return;
+		    }
+
+		    // --- CASE B: HOST (Player 1) ---
+		    // Execute locally, set global state, and broadcast.
+		    // We do NOT use the standard fallthrough logic because that is for Hotseat (swapping turns).
+		    // We want to lock the Host UI and show the proposal to the Joiner.
+		    try {
+		        var hostTrade = readTrade();
+		        
+		        // 1. Save as Active Trade
+		        window.currentActiveTrade = hostTrade;
+		        
+		        // 2. Update Host UI to "Waiting" state (Can only Cancel)
+		        $("#proposetradebutton").hide();
+		        $("#accepttradebutton").hide();
+		        $("#rejecttradebutton").hide();
+		        $("#canceltradebutton").show().prop("disabled", false);
+		        
+		        // 3. Broadcast so Joiner sees the window open
+		        broadcastGameState();
+		        
+		    } catch(e) { console.error("Host Trade Error", e); }
+		    
+		    return; // Stop standard logic
+		}
+
+		
 		if (isNaN(document.getElementById("trade-leftp-money").value)) {
 			document.getElementById("trade-leftp-money").value = "This value must be a number.";
 			document.getElementById("trade-leftp-money").style.color = "red";
@@ -1386,7 +1498,13 @@ function popup(HTML, action, option) {
 	}
 
         // 5. Animate Background
-	$("#popupbackground").fadeIn(400);
+	$("#popupbackground").fadeIn(400, function() {
+        // Callback: Broadcast AGAIN after animation finishes
+        // This catches cases where the first broadcast might have been missed or overwritten
+        if (window.broadcastGameState) {
+            window.broadcastGameState();
+        	}
+    	});
 
         // 6. Manage Button States (P2P Locking)
         if (window.nostrManager && window.nostrManager.gameId) {
@@ -1539,24 +1657,54 @@ function updateMoney() {
 		$("#resignbutton").hide();
 		$("#nextbutton").show();
 	}
-	// --- VISUAL LOCK FOR HOST ---
+	
+	// --- VISUAL LOCK FOR P2P ---
         if (window.nostrManager && window.nostrManager.gameId) {
-        var myIndex = window.MY_PLAYER_INDEX || 1;
-        var isMyTurn = (turn === myIndex);
-        var landedBox = document.getElementById("landed");
+            var myIndex = window.MY_PLAYER_INDEX || 1;
+            var isMyTurn = (turn === myIndex);
+            var landedBox = document.getElementById("landed");
         
-        if (landedBox) {
+            // 1. Lock/Unlock the "Landed" Box (Buy/Pay Buttons)
+            if (landedBox) {
+                if (!isMyTurn) {
+                    $(landedBox).find("input, button")
+                        .prop("disabled", true)
+                        .css("opacity", "0.5");
+                } else {
+                    $(landedBox).find("input, button")
+                        .prop("disabled", false)
+                        .css("opacity", "1.0");
+                }
+            }
+
+            // 2. Lock/Unlock Menu Tabs (Manage & Trade)
+            var manageTab = $("#manage-menu-item a, #manage-menu-item");
+            var tradeTab = $("#trade-menu-item a, #trade-menu-item");
+
             if (!isMyTurn) {
-                $(landedBox).find("input, button")
-                    .prop("disabled", true)
-                    .css("opacity", "0.5");
+                // DISABLE TABS
+                manageTab.css({ "opacity": "0.5", "pointer-events": "none", "cursor": "not-allowed" });
+                tradeTab.css({ "opacity": "0.5", "pointer-events": "none", "cursor": "not-allowed" });
+            
+                manageTab.attr("title", "You can only manage properties on your turn.");
+                tradeTab.attr("title", "You can only trade on your turn.");
+
+                // FORCE CLOSE: If they are currently inside a forbidden tab, kick them back to 'Buy'
+                if ($("#manage").is(":visible") || $("#trade").is(":visible")) {
+                    $("#buy").show();
+                    $("#manage").hide();
+                    $("#trade").hide();
+                }
             } else {
-                $(landedBox).find("input, button")
-                    .prop("disabled", false)
-                    .css("opacity", "1.0");
+                // ENABLE TABS
+                manageTab.css({ "opacity": "1.0", "pointer-events": "auto", "cursor": "pointer" });
+                tradeTab.css({ "opacity": "1.0", "pointer-events": "auto", "cursor": "pointer" });
+            
+                manageTab.attr("title", "View, mortgage, and improve your property.");
+                tradeTab.attr("title", "Exchange property with other players.");
             }
         }
-    }
+    
 }
 
 function updateDice() {
@@ -1897,9 +2045,12 @@ function chanceCommunityChest() {
 		var msg = "<img src='/images/community_chest_icon.png' style='height: 50px; width: 53px; float: left; margin: 8px 8px 8px 0px;' /><div style='font-weight: bold; font-size: 16px; '>Community Chest:</div><div style='text-align: justify;'>" + communityChestCards[communityChestIndex].text + "</div>";
 
 		if (p.human) {
+		// FIX: If P2P Game, show immediately. If Local Game, add delay for UX.
+            	var delay = (window.nostrManager && window.nostrManager.gameId) ? 0 : 800;
+		
 			setTimeout(function() {
 			    popup(msg, runCard);
-            }, 800);
+            }, delay);
 		} else {
 			// AI: Show the popup for X ms so the human can read it, then run the card
 			popup(msg); // Show it (no callback yet)
@@ -1934,9 +2085,12 @@ function chanceCommunityChest() {
 		var msg = "<img src='/images/chance_icon.png' style='height: 50px; width: 26px; float: left; margin: 8px 8px 8px 0px;' /><div style='font-weight: bold; font-size: 16px; '>Chance:</div><div style='text-align: justify;'>" + chanceCards[chanceIndex].text + "</div>";
 
 		if (p.human) {
+		// FIX: If P2P Game, show immediately. If Local Game, add delay for UX.
+            	var delay = (window.nostrManager && window.nostrManager.gameId) ? 0 : 800;
+		
 			setTimeout(function() {
 			    popup(msg, runCard);
-            }, 800);
+            }, delay);
 		} else {
 			// AI: Show popup for X ms, then run
 			popup(msg);
@@ -2272,6 +2426,15 @@ function useJailCard() {
 }
 
 function buyHouse(index) {
+	// P2P INTERCEPTION
+        if (!window.isExecutingRemote && window.nostrManager && window.nostrManager.gameId) {
+            var myIndex = window.MY_PLAYER_INDEX || 1;
+            if (myIndex !== 1) {
+                window.nostrManager.sendAction('BUY_HOUSE', { index: index });
+                return false;
+            }
+        }
+	
 	var sq = square[index];
 	var p = player[sq.owner];
 	var houseSum = 0;
@@ -2321,6 +2484,15 @@ function buyHouse(index) {
 }
 
 function sellHouse(index) {
+	// P2P INTERCEPTION
+        if (!window.isExecutingRemote && window.nostrManager && window.nostrManager.gameId) {
+            var myIndex = window.MY_PLAYER_INDEX || 1;
+            if (myIndex !== 1) {
+                window.nostrManager.sendAction('SELL_HOUSE', { index: index });
+                return;
+            }
+        }
+	
 	var sq = square[index];
 	var p = player[sq.owner];
 
@@ -2514,6 +2686,16 @@ function buy() {
 }
 
 function mortgage(index) {
+	// P2P INTERCEPTION
+        if (!window.isExecutingRemote && window.nostrManager && window.nostrManager.gameId) {
+            var myIndex = window.MY_PLAYER_INDEX || 1;
+            // Only Joiners need to send actions. Host runs locally.
+            if (myIndex !== 1) {
+                window.nostrManager.sendAction('MORTGAGE', { index: index });
+                return false; // Stop local execution
+            }
+        }
+	
 	var sq = square[index];
 	var p = player[sq.owner];
 
@@ -2538,6 +2720,15 @@ function mortgage(index) {
 }
 
 function unmortgage(index) {
+	// P2P INTERCEPTION
+        if (!window.isExecutingRemote && window.nostrManager && window.nostrManager.gameId) {
+            var myIndex = window.MY_PLAYER_INDEX || 1;
+            if (myIndex !== 1) {
+                window.nostrManager.sendAction('UNMORTGAGE', { index: index });
+                return false;
+            }
+        }
+	
 	var sq = square[index];
 	var p = player[sq.owner];
 	var unmortgagePrice = Math.round(sq.price * 0.55);
@@ -3017,8 +3208,80 @@ function setup() {
     // ============================================================
     if (window.nostrManager && window.nostrManager.gameId && window.connectedPlayers && window.connectedPlayers.length > 0) {
         
+        // The user might have changed their name/color while waiting in the lobby.
+        // We ensure the Host (Index 1) reflects the current HTML input values.
+        var p1NameInput = document.getElementById("player1name");
+        var p1ColorInput = document.getElementById("player1color");
+        
+        if (p1NameInput && p1ColorInput) {
+            // Find the Host object in the connected list (Index 1)
+            var hostEntry = window.connectedPlayers.find(function(p) { return p.index === 1; });
+            
+            if (hostEntry) {
+                hostEntry.name = p1NameInput.value;
+                hostEntry.color = p1ColorInput.value.toLowerCase();
+                
+                // Optional: Broadcast this name change so Joiners see it immediately 
+                // in their lobby list before the game board loads.
+                if (window.nostrManager) {
+                    window.nostrManager.broadcastGameUpdate({ players: window.connectedPlayers }, 'LOBBY_UPDATE');
+                }
+            }
+        }
+        
+        // 1. Check for Saved Game Data
+        var saveKey = 'monopoly_state_' + window.nostrManager.gameId;
+        var savedData = localStorage.getItem(saveKey);
+
+        if (savedData) {
+            console.log("📂 Found saved game! Checking integrity...");
+            try {
+                var parsed = JSON.parse(savedData);
+                
+                // --- INTEGRITY CHECKS ---
+                
+                // Fix 1: Never allow Turn 0 (The Bank)
+                if (!parsed.turn || parsed.turn < 1) {
+                    console.warn("⚠️ Corrupt Save: Turn was 0. Fixing to 1.");
+                    parsed.turn = 1;
+                }
+                
+                // Fix 2: Ensure Player Array exists
+                if (!parsed.players || parsed.players.length < 2) {
+                    throw new Error("Corrupt Save: Not enough players.");
+                }
+
+                // Fix 3: Ensure Player 1 is not "the bank" (Double check names)
+                if (parsed.players[1] && parsed.players[1].name === "the bank") {
+                     throw new Error("Corrupt Save: Player 1 is broken.");
+                }
+
+                // Restore
+                console.log("✅ Save valid. Restoring...");
+                window.loadRemoteGameState(parsed);
+                
+                // Force sync global turn
+                window.turn = parsed.turn;
+                
+                // We are done! Exit setup early.
+                return;
+
+            } catch (e) {
+                console.error("❌ Save file corrupted. Starting fresh.", e);
+                // Delete the bad file so it doesn't happen again
+                localStorage.removeItem(saveKey);
+                // Fall through to normal fresh setup below...
+            }
+        }
+
+        // 2. If no saved data, start fresh (Your existing loop)
+        
         pcount = window.connectedPlayers.length;
         document.getElementById("playernumber").value = pcount;
+        
+        if (window.nostrManager.saveGameToHistory) {
+            window.nostrManager.saveGameToHistory(window.nostrManager.gameId);
+        }        
 
         for (var i = 0; i < pcount; i++) {
             var lobbyData = window.connectedPlayers[i];
@@ -3923,16 +4186,38 @@ window.loadRemoteGameState = function(remoteState) {
     // 2. RE-HYDRATE PLAYERS (Critical Fix)
     // We must rebuild the Player objects to restore their .pay() methods
     if (remoteState.players) {
-        player = []; // Clear existing global
+        player = []; 
+        
         for (var i = 0; i < remoteState.players.length; i++) {
             var raw = remoteState.players[i];
-            // Create a fresh Player instance (this restores .pay, .AI, etc.)
-            var newP = new Player(raw.name, raw.color);
             
-            // Copy data fields from the raw network object to the new instance
-            // We use a loop to copy money, position, jail status, etc.
+            // --- FIX START: Self-Heal Name/Color from Lobby ---
+            var finalName = raw.name;
+            var finalColor = raw.color;
+
+            // If the saved name is generic or color is missing, try to fetch from Lobby
+            if (window.connectedPlayers && window.connectedPlayers.length > 0) {
+                // Find the lobby member corresponding to this index
+                // (Note: connectedPlayers stores 1-based index, loop 'i' is the actual index)
+                var lobbyMember = window.connectedPlayers.find(function(p) { return p.index === i; });
+                
+                if (lobbyMember) {
+                    // Prefer Lobby data if Save data looks broken
+                    if (!finalName || finalName.indexOf("Player") === 0) {
+                        finalName = lobbyMember.name;
+                    }
+                    if (!finalColor) {
+                        finalColor = lobbyMember.color;
+                    }
+                }
+            }
+            
+            // Create a fresh Player instance (this restores .pay, .AI, etc.)
+            var newP = new Player(finalName, finalColor);
+            
+            // Copy remaining data (money, position, etc.)
             for (var key in raw) {
-                if (raw.hasOwnProperty(key)) {
+                if (raw.hasOwnProperty(key) && key !== "name" && key !== "color") {
                     newP[key] = raw[key];
                 }
             }
@@ -4055,6 +4340,14 @@ window.loadRemoteGameState = function(remoteState) {
 
         if (isMyTurn && remoteState.popupVis !== 'none') {
             // It's my turn, so I should be able to click OK.
+            
+            // The Host might have sent them as "disabled" because it wasn't the Host's turn.
+            // We must unlock them for the player whose turn it actually is.
+            $("#popupclose, #popupyes, #popupno")
+                .prop("disabled", false)
+                .css("opacity", "1.0")
+                .css("cursor", "pointer");
+            
             $("#popupclose, #popupyes, #popupno").off("click").on("click", function() {
                 // Hide locally immediately for better UX
                 $(popupWrap).hide();
@@ -4063,10 +4356,8 @@ window.loadRemoteGameState = function(remoteState) {
                 window.nostrManager.sendAction('POPUP_CLOSE');
             });
         } else {
-            // Not my turn? Disable buttons so I can't dismiss the Host's popup.
-            // (Or leave them enabled if you want "Spectators" to be able to close their own view, 
-            // but for now let's disable to enforce state sync).
-            $("#popupclose, #popupyes, #popupno").prop("disabled", true);
+            // Not my turn? Keep them disabled.
+            $("#popupclose, #popupyes, #popupno").prop("disabled", true).css("opacity", 0.5);
         }
     }
     
@@ -4101,8 +4392,61 @@ window.loadRemoteGameState = function(remoteState) {
             bidBtns.prop("disabled", true).css("opacity", 0.5);
         }
     }
+    
+    // G. Trade Sync
+    if (remoteState.tradeData) {
+        // --- ACTIVE TRADE ---
+        
+        // 1. Reconstruct Object
+        var remoteTrade = window.deserializeTrade(remoteState.tradeData);
+        
+        // 2. Write to DOM
+        if (window.writeTrade) {
+            window.writeTrade(remoteTrade);
+        }
+        
+        // 3. Show Window / Hide Board
+        $("#board").hide();
+        $("#control").hide();
+        $("#trade").show();
+        
+        // 4. Manage Buttons
+        var myIndex = window.MY_PLAYER_INDEX || 2;
+        var initiatorIndex = remoteTrade.getInitiator().index;
+        var recipientIndex = remoteTrade.getRecipient().index;
 
-    // G. CRITICAL: Manage Button States based on "Is it my turn?"
+        if (myIndex === recipientIndex) {
+            // Recipient: Accept/Reject
+            $("#proposetradebutton, #canceltradebutton").hide();
+            $("#accepttradebutton").show().prop("disabled", false);
+            $("#rejecttradebutton").show().prop("disabled", false);
+        } else if (myIndex === initiatorIndex) {
+            // Proposer: Cancel only
+            $("#proposetradebutton, #accepttradebutton, #rejecttradebutton").hide();
+            $("#canceltradebutton").show().prop("disabled", false);
+        } else {
+            // Spectator
+            $("#trade input").prop("disabled", true);
+        }
+
+    } else {
+        // --- NO TRADE (Game Board Mode) ---
+        
+        // FIX: Force Close Trade Window
+        $("#trade").hide();
+        
+        // FIX: Force Open Board (Only if we are actually in the game, not lobby)
+        var setupDiv = document.getElementById("setup");
+        if (setupDiv && setupDiv.style.display === "none") {
+            $("#board").show();
+            $("#control").show();
+        }
+        
+        // Cleanup global trade reference
+        window.currentActiveTrade = null;
+    }
+
+    // H. Manage Button States based on "Is it my turn?"
     var myIndex = window.MY_PLAYER_INDEX || 2; // Joiner is usually 2
     var isMyTurn = (turn === myIndex);
 
@@ -4187,12 +4531,19 @@ function broadcastGameState() {
             nextBtnVal: document.getElementById("nextbutton").value,
             nextBtnDisabled: document.getElementById("nextbutton").disabled,
             
+            // FIX: Sync Trade Data
+            tradeData: window.currentActiveTrade ? window.serializeTrade(window.currentActiveTrade) : null,
+            tradeVis: document.getElementById("trade").style.display,
+            
             //Add auction info
             auctionInputVal: bidInput ? bidInput.value : "",
             auctionInputColor: bidInput ? bidInput.style.color : "black",
             
             auctionData: game.getAuctionState ? game.getAuctionState() : null,
         };
+        
+        var saveKey = 'monopoly_state_' + window.nostrManager.gameId;
+        localStorage.setItem(saveKey, JSON.stringify(state));
 
         window.nostrManager.broadcastGameUpdate(state, 'STATE');
     }
@@ -4204,49 +4555,73 @@ window.broadcastGameState = broadcastGameState;
 
 // === P2P HANDLERS (Host Side) ===
 
-// 1. Handle Join Request (Sync Names)
 window.handlePlayerJoin = function(data) {
-    // 1. Add Host if list is empty
+    // 1. Initialize Host if empty
     if (window.connectedPlayers.length === 0) {
         var hostName = document.getElementById("player1name").value || "Host";
         var hostColor = document.getElementById("player1color").value || "Yellow";
-        // Host is always Index 1 (we use 1-based index for logic, push 0-based object)
-        window.connectedPlayers.push({ index: 1, name: hostName, color: hostColor, pubkey: window.nostrManager.pk });
+        window.connectedPlayers.push({ index: 1, name: hostName, color: hostColor.toLowerCase(), pubkey: window.nostrManager.pk });
     }
 
-    // 2. Check if this player is already here (deduplicate by Pubkey)
+    // 2. Check if player exists
     var existing = window.connectedPlayers.find(function(p) { return p.pubkey === data.pubkey; });
-    
-    if (!existing) {
-        // Assign next index (List length + 1)
-        var newIndex = window.connectedPlayers.length + 1;
-        
-        if (newIndex > 8) {
-            console.warn("Lobby full!");
-            return; // Max 8 players
-        }
+    var playerObj = existing;
 
-        var newPlayer = {
+    if (!existing) {
+        if (window.connectedPlayers.length >= 8) return; // Full
+
+        var newIndex = window.connectedPlayers.length + 1;
+        playerObj = {
             index: newIndex,
             name: data.name,
-            color: data.color,
+            color: data.color.toLowerCase(),
             pubkey: data.pubkey
         };
-        
-        window.connectedPlayers.push(newPlayer);
-        console.log("👋 " + data.name + " joined as Player " + newIndex);
+        window.connectedPlayers.push(playerObj);
+        console.log("👋 New Player Joining:", data.name);
     } else {
-        // Update existing info (maybe they changed color)
-        existing.name = data.name;
-        existing.color = data.color;
+        // Update basic info for existing player
+        playerObj.name = data.name;
+        playerObj.color = data.color.toLowerCase();
     }
 
-    // 3. Broadcast LOBBY_UPDATE so everyone sees the list
+    // --- CONFLICT RESOLUTION ---
+    // We check THIS player against all OTHERS to ensure uniqueness.
+    
+    // A. Fix Color Conflict
+    var takenColors = new Set();
+    window.connectedPlayers.forEach(function(p) {
+        if (p.index !== playerObj.index) takenColors.add(p.color);
+    });
+
+    if (takenColors.has(playerObj.color)) {
+        // Color taken! Find a free one.
+        var ALL_COLORS = ['yellow', 'blue', 'red', 'lime', 'green', 'aqua', 'orange', 'purple'];
+        var freeColor = ALL_COLORS.find(function(c) { return !takenColors.has(c); });
+        
+        if (freeColor) {
+            console.log("⚠️ Color conflict! Changing " + playerObj.name + " to " + freeColor);
+            playerObj.color = freeColor;
+        }
+    }
+
+    // B. Fix Name Conflict
+    var takenNames = new Set();
+    window.connectedPlayers.forEach(function(p) {
+        if (p.index !== playerObj.index) takenNames.add(p.name);
+    });
+
+    if (takenNames.has(playerObj.name)) {
+        console.log("⚠️ Name conflict! Appending ID.");
+        playerObj.name = playerObj.name + " " + playerObj.index;
+    }
+    // ---------------------------
+
+    // 3. Broadcast Update
     if (window.nostrManager) {
         window.nostrManager.broadcastGameUpdate({ players: window.connectedPlayers }, 'LOBBY_UPDATE');
     }
     
-    // 4. Update Host's own UI
     if (window.updateLobbyUI) window.updateLobbyUI(window.connectedPlayers);
 };
 
@@ -4265,6 +4640,18 @@ window.handleRemoteAction = function(action, payload) {
             case 'BUY':
                 buy();
                 break;
+            case 'MORTGAGE':
+                if (window.mortgage) window.mortgage(payload.index);
+                break;
+            case 'UNMORTGAGE':
+                if (window.unmortgage) window.unmortgage(payload.index);
+                break;
+            case 'BUY_HOUSE':
+                if (window.buyHouse) window.buyHouse(payload.index);
+                break;
+            case 'SELL_HOUSE':
+                if (window.sellHouse) window.sellHouse(payload.index);
+                break;    
             case 'PAY_FINE':
                 payfifty();
                 break;
@@ -4293,6 +4680,59 @@ window.handleRemoteAction = function(action, payload) {
             case 'AUCTION_EXIT':
             	game.auctionExit();
             	break;
+    	    case 'TRADE_PROPOSE':
+                console.log("📩 Host received Trade Proposal");
+                var tradeObj = window.deserializeTrade(payload);
+                
+                if (window.writeTrade) {
+                    window.writeTrade(tradeObj);
+                
+                    // Save state
+                    window.currentActiveTrade = tradeObj;
+            
+                    // UI Logic: Show Accept/Reject buttons
+                    $("#proposetradebutton, #canceltradebutton").hide();
+                    $("#accepttradebutton").show();
+                    $("#rejecttradebutton").show();
+            
+                    // Open window if closed
+                    $("#trade").show();
+                    $("#board").hide();
+                    $("#control").hide();
+            
+                    setTimeout(broadcastGameState, 200);
+            	} else {
+                    console.error("❌ writeTrade function not found!");
+                }
+                break;
+            case 'TRADE_CANCEL':
+                console.log("🚫 Remote Trade Cancel/Reject");
+            
+                // 1. Run standard cancel logic (Resets UI on Host)
+                game.cancelTrade();
+            
+                // 2. Clear Global State (Critical)
+                window.currentActiveTrade = null;
+            
+                // 3. Broadcast (Sends tradeData: null to Joiner so their window closes)
+                setTimeout(broadcastGameState, 200);
+                break;
+
+            case 'TRADE_ACCEPT':
+                console.log("✅ Remote Trade Accept");
+            
+                if (window.currentActiveTrade) {
+                    // 1. Run standard accept logic (Swaps assets, updates money)
+                    // Note: game.acceptTrade usually calls cancelTrade internally to close the UI
+                    game.acceptTrade(window.currentActiveTrade);
+                
+                    // 2. Clear Global State
+                    window.currentActiveTrade = null;
+                }
+            
+                // 3. Broadcast (Sends new Money/Property owners + tradeData: null)
+                setTimeout(broadcastGameState, 200);
+                break;
             case 'RESIGN':
                 game.resign();
                 break;
@@ -4309,4 +4749,82 @@ window.handleRemoteAction = function(action, payload) {
     if (action !== 'POPUP_CLOSE') {
         setTimeout(broadcastGameState, 200);
     }
+};
+
+// === LOBBY CONFLICT SOLVER ===
+window.resolveLobbyConflicts = function() {
+    var players = window.connectedPlayers;
+    if (!players || players.length === 0) return;
+
+    // 1. Identify Host (Authority)
+    var host = players.find(function(p) { return p.index === 1; });
+    if (!host) return;
+
+    var ALL_COLORS = ['yellow', 'blue', 'red', 'lime', 'green', 'aqua', 'orange', 'purple'];
+
+    // 2. Iterate through Joiners to ensure they don't clash with Host (or each other)
+    // We sort by index so P2 gets priority over P3, etc.
+    players.sort(function(a, b) { return a.index - b.index; });
+
+    players.forEach(function(p) {
+        if (p.index === 1) return; // Never change the Host
+
+        // A. Check Color Conflict
+        // We check against Host AND any players processed before this one
+        var takenColors = new Set();
+        players.forEach(function(other) {
+            if (other.index !== p.index) takenColors.add(other.color);
+        });
+
+        if (takenColors.has(p.color)) {
+            // Conflict found! Find a free color.
+            var freeColor = ALL_COLORS.find(function(c) { return !takenColors.has(c); });
+            if (freeColor) {
+                console.log("⚠️ Host took " + p.color + ". Moving Player " + p.index + " to " + freeColor);
+                p.color = freeColor;
+            }
+        }
+
+        // B. Check Name Conflict
+        var takenNames = new Set();
+        players.forEach(function(other) {
+            if (other.index !== p.index) takenNames.add(other.name);
+        });
+
+        if (takenNames.has(p.name)) {
+            p.name = p.name + " " + p.index;
+        }
+    });
+};
+
+// === TRADE SERIALIZER ===
+window.serializeTrade = function(tradeObj) {
+    if (!tradeObj) return null;
+    
+    var props = [];
+    for (var i = 0; i < 40; i++) {
+        props.push(tradeObj.getProperty(i));
+    }
+
+    return {
+        initiatorIndex: tradeObj.getInitiator().index,
+        recipientIndex: tradeObj.getRecipient().index,
+        money: tradeObj.getMoney(),
+        properties: props,
+        communityChestJail: tradeObj.getCommunityChestJailCard(),
+        chanceJail: tradeObj.getChanceJailCard()
+    };
+};
+
+// === TRADE DESERIALIZER ===
+window.deserializeTrade = function(data) {
+    if (!data) return null;
+    return new Trade(
+        player[data.initiatorIndex],
+        player[data.recipientIndex],
+        data.money,
+        data.properties,
+        data.communityChestJail,
+        data.chanceJail
+    );
 };

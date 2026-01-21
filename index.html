@@ -12,7 +12,6 @@
     <!-- ================= CASHU MODAL START ================= -->
     <div id="buyin-modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.98); z-index:99999; color:white; display:none; flex-direction:column; align-items:center; justify-content:center; text-align: center; font-family: sans-serif;">
       <h1 style="color: #ff9900; font-size: 3em; margin: 0;">⚡ Cashu Monopoly 🎩</h1>
-      <h1 style="color:red; z-index:9999; position:fixed; top:0;">TESTING MODE</h1> 
       
       <!-- STEP 1: CONFIGURATION -->
       <div id="step-config" style="margin-top:20px; width: 80%; max-width: 500px;">
@@ -176,53 +175,61 @@
             </button>
         </div>
     </div>
-
-    <!-- 2. HOST PANEL -->
+    
+    <!-- 2. HISTORY DROPDOWN (Visible only if history exists) -->
+    <div id="resume-panel" style="display:none; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 15px;">
+        <p style="color:#aaa; font-size:0.9em; margin-bottom:5px;">Resume Previous Game:</p>
+        <div style="display: flex; gap: 5px;">
+            <select id="history-select" style="flex:1; padding:10px; border-radius:5px; border:1px solid #555; background:#222; color:white; font-size:0.9em;">
+                <option value="">-- Select a Game --</option>
+            </select>
+            <button id="btn-resume-game" style="padding:10px 15px; background:#FF9800; border:none; color:white; border-radius:5px; cursor:pointer; font-weight:bold;">
+                Load
+            </button>
+        </div>
+    </div>
+	
+    <!-- 3. HOST PANEL -->
     <div id="host-panel" style="display:none; background: #333; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ff9900;">
-        <p style="color: #ff9900; margin: 0 0 10px 0; font-weight: bold;">Game ID:</p>
+        <p style="color: #ff9900; margin: 0 0 10px 0; font-weight: bold;">Current Game ID:</p>
+        <div style="display: flex; gap: 8px; margin-bottom: 15px; align-items: stretch;">
         
-        <!-- NEW: Toggle between New vs Resume -->
-        <div style="display: flex; gap: 5px; margin-bottom: 10px;">
-            <button id="btn-host-new" style="flex:1; padding:6px; background:#4CAF50; border:none; color:white; border-radius:4px; cursor:pointer; font-size:0.85em;">
-                🆕 New Game
-            </button>
-            <button id="btn-host-resume" style="flex:1; padding:6px; background:#9C27B0; border:none; color:white; border-radius:4; cursor:pointer; font-size:0.85em;">
-                🔁 Resume Game
-            </button>
+        <!-- The ID Display -->
+        <div id="game-id-display" style="font-family: monospace; font-size: 1.4em; background: #000; padding: 10px; border-radius: 5px; word-break: break-all; color: #fff; padding-left:clamp(7.4vw, 95px, 160px);padding-right: clamp(7.4vw, 95px, 160px);">
+            Generating...
+        </div>
+        
+         <!-- Copy Button -->
+        <button id="btn-copy-id" title="Copy to Clipboard" style="width: 50px; background: #444; border: 1px solid #666; border-radius: 5px; cursor: pointer; font-size: 1.5em; display: flex; align-items: center; justify-content: center;">
+                📋
+        </button>
+        
+
         </div>
 
-        <!-- Input for existing Game ID (hidden by default) -->
-        <div id="resume-input-section" style="display:none; margin-bottom:10px;">
-            <input type="text" id="host-resume-input" placeholder="Enter existing Game ID" style="width:100%; padding:8px; border-radius:4px; border:1px solid #555; background:#222; color:white; font-family:monospace; font-size:1em;" maxlength="8">
-        </div>
-
-        <!-- Game ID Display -->
-        <div id="game-id-display" style="font-family: monospace; font-size: 1.4em; background: #000; padding: 10px; border-radius: 5px; word-break: break-all; color: #fff;">—</div>
-        <p id="host-instructions" style="color: #aaa; font-size: 0.8em; margin-top: 5px;">Generating new game...</p>
-        
         <!-- Player List -->
-        <p style="color: #aaa; font-size: 0.9em; margin-top: 15px; border-bottom: 1px solid #555; padding-bottom: 5px;">Lobby Members:</p>
+        <p style="color: #aaa; font-size: 0.9em; margin: 0 0 5px 0; border-bottom: 1px solid #555; padding-bottom: 5px;">Lobby Members:</p>
         <ul id="lobby-player-list" style="list-style: none; padding: 0; margin: 0; color: white; font-size: 0.9em;">
-            <!-- Players will appear here dynamically -->
+            <!-- JS fills this -->
         </ul>
     </div>
 
-    <!-- 3. JOIN PANEL -->
+    <!-- 4. JOIN PANEL -->
     <div id="join-panel" style="display:none; margin-bottom: 20px;">
         <p style="color:#aaa; font-size:0.9em; margin-bottom:5px;">Paste Game ID:</p>
         <div style="display: flex; gap: 5px;">
-            <input type="text" id="join-game-input" placeholder="npub... or hex..." style="flex:1; padding:10px; border-radius:5px; border:1px solid #555; background:#222; color:white;">
+            <input type="text" id="join-game-input" placeholder="hex..." style="flex:1; padding:10px; border-radius:5px; border:1px solid #555; background:#222; color:white;">
             <button id="btn-connect-join" style="padding:10px 20px; background:#ff9900; border:none; color:white; border-radius:5px; cursor:pointer; font-weight:bold;">Connect</button>
         </div>
         
         <!-- Player List -->
-        <p style="color: #aaa; font-size: 0.9em; margin-top: 15px; border-bottom: 1px solid #555; padding-bottom: 5px;">Lobby Members:</p>
-        <ul id="lobby-player-list" style="list-style: none; padding: 0; margin: 0; color: white; font-size: 0.9em;">
-            <!-- Players will appear here dynamically -->
-        </ul>
+        <div id="join-lobby-container" style="display:none; margin-top: 15px; background: #2a2a2a; padding: 10px; border-radius: 5px;">
+            <p style="color: #aaa; font-size: 0.9em; margin: 0 0 5px 0; border-bottom: 1px solid #555; padding-bottom: 5px;">Lobby Members:</p>
+            <ul id="join-player-list" style="list-style: none; padding: 0; margin: 0; color: white; font-size: 0.9em;"></ul>
+        </div>
     </div>
 
-    <!-- 4. PLAYER 1 CONFIG (Always You) -->
+    <!-- 5. PLAYER CONFIG -->
     <div id="player1input" class="player-input" style="display:block; border-left: 5px solid yellow;">
         <label style="font-size:0.8em; color:#aaa;">Your Name</label>
         <input type="text" id="player1name" maxlength="16" value="Player 1" />
@@ -284,7 +291,7 @@
         </div>
     </div>
 
-    <!-- 5. HIDDEN/AUTOMATED INPUTS FOR ENGINE -->
+    <!-- 6. HIDDEN/AUTOMATED INPUTS FOR ENGINE -->
     <div style="display:none;">
         <input type="hidden" id="playernumber" value="2">
         <div id="visible-player-count">2</div>
@@ -301,7 +308,7 @@
         </div>
     </div>
 
-    <!-- 6. START BUTTON -->
+    <!-- 7. START BUTTON -->
     <input type="button" value="START GAME" id="btn-start-game" class="start-btn" style="display:none;" />
 
     <div class="disclaimer-box">

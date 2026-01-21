@@ -136,12 +136,24 @@ nostrManager.onGameStateReceived = (state) => {
     if (window.loadRemoteGameState) window.loadRemoteGameState(state);
 };
 
-// When a Joiner asks for the state, the Host sends it immediately
 nostrManager.onSyncRequest = () => {
-    // @ts-ignore
-    if (window.broadcastGameState) {
-        console.log("🔄 Re-broadcasting state to new joiner...");
+    const setupDiv = document.getElementById("setup");
+    
+    // Check if Game is Running (Setup is hidden)
+    if (setupDiv && setupDiv.style.display === "none") {
+        // Game Running: Send Board State
         // @ts-ignore
-        window.broadcastGameState();
+        if (window.broadcastGameState) {
+            console.log("🔄 Re-broadcasting GAME STATE...");
+            // @ts-ignore
+            window.broadcastGameState();
+        }
+    } else {
+        // Lobby Open: Send Player List
+        console.log("🔄 Re-broadcasting LOBBY LIST...");
+        const players = (window as any).connectedPlayers;
+        if (players && nostrManager.broadcastGameUpdate) {
+            nostrManager.broadcastGameUpdate({ players: players }, 'LOBBY_UPDATE');
+        }
     }
 };

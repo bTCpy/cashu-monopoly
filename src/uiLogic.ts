@@ -1,6 +1,8 @@
 import { connectToMint, requestMint, getEncodedToken, pollForPayment, getBalance, AVAILABLE_MINTS, cleanupSpentTokens } from './walletManager';
 import QRCode from 'qrcode';
 
+import { Clipboard } from '@capacitor/clipboard';
+
 
 import { NostrGameManager } from './nostrGame';
 export const nostrManager = new NostrGameManager();
@@ -46,44 +48,107 @@ export function initUiLogic() {
     
     // Expose for monopoly.js / nostrGame.ts to call
     (window as any).updateLobbyUI = function(players: any[]) {
-    const listHost = document.getElementById("lobby-player-list");
-    if (!listHost) return;
+    // Target BOTH lists
+    const hostList = document.getElementById("lobby-player-list");
+    const joinList = document.getElementById("join-player-list");
+    const joinContainer = document.getElementById("join-lobby-container");
 
-    listHost.innerHTML = ""; // Clear list
+    // Clear both
+    if (hostList) hostList.innerHTML = "";
+    if (joinList) joinList.innerHTML = "";
+    
+    // Show the container for Joiners if data exists
+    if (joinContainer) {
+        joinContainer.style.display = players.length > 0 ? "block" : "none";
+    }
 
     const myPubkey = (window as any).nostrManager.pk;
 
     players.forEach(p => {
-        // 1. Render List Item
-        const li = document.createElement("li");
-        li.style.borderBottom = "1px solid #444";
-        li.style.padding = "5px";
-        li.innerText = `${p.index}. ${p.name} (${p.color})`;
-        listHost.appendChild(li);
+        const liContent = document.createElement("li");
+        liContent.style.borderBottom = "1px solid #444";
+        liContent.style.padding = "5px";
         
         let labelText = `${p.index}. ${p.name}`;
-
+        
         if (p.pubkey === myPubkey) {
             labelText += " (You)";
-            (window as any).MY_PLAYER_INDEX = p.index; // Ensure index is set
+            (window as any).MY_PLAYER_INDEX = p.index;
+            
+            // --- SYNC INPUTS (Existing Logic) ---
+            const nameInput = document.getElementById("player1name") as HTMLInputElement;
+            const colorSelect = document.getElementById("player1color") as HTMLSelectElement;
+            if (nameInput && document.activeElement !== nameInput) nameInput.value = p.name;
+            if (colorSelect && colorSelect.value.toLowerCase() !== p.color) {
+                for(let i=0; i<colorSelect.options.length; i++) {
+                    if (colorSelect.options[i].value.toLowerCase() === p.color) {
+                        colorSelect.selectedIndex = i;
+                        if ((window as any).updateBorderColor) (window as any).updateBorderColor(1);
+                        break;
+                    }
+                }
+            }
+            // ------------------------------------
         } else if (p.index === 1) {
             labelText += " (Host)";
         }
         
-        li.innerText = `${labelText} [${p.color}]`;
-        listHost.appendChild(li);
+        liContent.innerText = `${labelText} [${p.color}]`;
+
+        // Append Clone to Host List
+        if (hostList) hostList.appendChild(liContent.cloneNode(true));
+        // Append Clone to Join List
+        if (joinList) joinList.appendChild(liContent.cloneNode(true));
     });
     
     // Update pcount hidden input
     const pCountInput = document.getElementById("playernumber") as HTMLInputElement;
-    if (pCountInput) {
-        pCountInput.value = players.length.toString();
-    }
+    if (pCountInput) pCountInput.value = players.length.toString();
     
     // Update visual count
     const visCount = document.getElementById("visible-player-count");
     if (visCount) visCount.innerText = players.length.toString();
+
+    // Clear the "Connection Timeout" if we successfully got data
+    if ((window as any).connectTimeout) {
+        clearTimeout((window as any).connectTimeout);
+        (window as any).connectTimeout = null;
+        updateStatus(`Connected! You are Player ${(window as any).MY_PLAYER_INDEX}`);
+    }
 };
+}
+
+function loadHistoryUI() {
+    const historySelect = document.getElementById("history-select") as HTMLSelectElement;
+    const resumePanel = document.getElementById("resume-panel");
+    const manager = (window as any).nostrManager;
+    
+    if (!historySelect || !resumePanel || !manager) return;
+
+    const history = manager.getGameHistory();
+
+    // Hide panel if no history
+    if (history.length === 0) {
+        resumePanel.style.display = "none";
+        return;
+    }
+
+    resumePanel.style.display = "block";
+    historySelect.innerHTML = `<option value="">-- Select a Game --</option>`;
+    
+    history.forEach((item: any) => {
+        const opt = document.createElement("option");
+        opt.value = item.id;
+        opt.innerText = `${item.timestamp} - ${item.id}`;
+        historySelect.appendChild(opt);
+    });
+    
+    const manualOpt = document.createElement("option");
+    manualOpt.value = "MANUAL_ENTRY";
+    manualOpt.innerText = "➕ Enter Game ID manually...";
+    manualOpt.style.fontWeight = "bold"; // Make it stand out
+    manualOpt.style.color = "#4CAF50";
+    historySelect.appendChild(manualOpt);
 }
 
 export async function hostGameUI() {
@@ -601,6 +666,8 @@ export function initWalletUi() {
 }
 
 export function setupLobbyUI() {
+    loadHistoryUI();
+    
     const btnLocal = document.getElementById('btn-local-game');
     const btnHost = document.getElementById('btn-host-game');
     const btnJoin = document.getElementById('btn-join-game');
@@ -609,6 +676,126 @@ export function setupLobbyUI() {
     const joinPanel = document.getElementById('join-panel');
     const startBtn = document.getElementById('btn-start-game');
     const p2AiSelect = document.getElementById('player2ai') as HTMLSelectElement;
+
+    // 2. Resume Button Logic
+    const btnResume = document.getElementById("btn-resume-game");
+    const historySelect = document.getElementById("history-select") as HTMLSelectElement;
+    
+    const p1Name = document.getElementById("player1name") as HTMLInputElement;
+    const p1Color = document.getElementById("player1color") as HTMLSelectElement;
+    
+    if (p1Name && p1Color) {
+        const savedName = localStorage.getItem('pref_p1_name');
+        const savedColor = localStorage.getItem('pref_p1_color');
+
+        if (savedName) {
+            p1Name.value = savedName;
+        }
+        
+        if (savedColor) {
+            p1Color.value = savedColor;
+            // Update the visual border color immediately
+            if ((window as any).updateBorderColor) {
+                (window as any).updateBorderColor(1);
+            }
+        }
+    }
+
+    const broadcastHostUpdate = () => {
+        // Only if I am Host
+        if ((window as any).nostrManager && (window as any).nostrManager.isHost) {
+            const players = (window as any).connectedPlayers;
+            
+            if (players && players.length > 0) {
+                // 1. Update Host Entry with new Input Values
+                const hostEntry = players.find((p: any) => p.index === 1);
+                if (hostEntry) {
+                    hostEntry.name = p1Name.value;
+                    hostEntry.color = p1Color.value.toLowerCase();
+                    
+                    // 2. FIX: Run Conflict Solver
+                    // This will move other players if the Host took their color
+                    if ((window as any).resolveLobbyConflicts) {
+                        (window as any).resolveLobbyConflicts();
+                    }
+
+                    // 3. Broadcast the (potentially modified) list
+                    (window as any).nostrManager.broadcastGameUpdate({ players: players }, 'LOBBY_UPDATE');
+                    
+                    // 4. Update Host's own UI list to show changes
+                    if ((window as any).updateLobbyUI) {
+                        (window as any).updateLobbyUI(players);
+                    }
+                }
+            }
+        }
+    };
+
+    p1Name?.addEventListener('input', () => {
+        // FIX: Save to storage
+        localStorage.setItem('pref_p1_name', p1Name.value);
+        
+        // Trigger broadcast
+        broadcastHostUpdate();
+    });
+    
+    p1Color?.addEventListener('change', () => {
+        // FIX: Save to storage
+        localStorage.setItem('pref_p1_color', p1Color.value);
+        
+        // Trigger broadcast
+        broadcastHostUpdate();
+    });
+
+    btnResume?.addEventListener('click', async () => {
+        let selectedId = historySelect.value;
+        if (!selectedId) return alert("Please select a game.");
+        
+        if (selectedId === "MANUAL_ENTRY") {
+            const manualInput = prompt("Paste the Game ID you want to Host:");
+            if (!manualInput) return; // Cancelled
+            
+            // Clean up input (remove whitespace)
+            selectedId = manualInput.trim();
+            
+            // Basic validation
+            if (selectedId.length < 8) {
+                return alert("Invalid Game ID. It should be at least 8 characters.");
+            }
+        }
+
+        // Switch UI to Host Mode
+        if(hostPanel) hostPanel.style.display = 'block';
+        if(joinPanel) joinPanel.style.display = 'none';
+        if(startBtn) startBtn.style.display = 'block';
+        
+        // Reset Lobby
+        const listHost = document.getElementById("lobby-player-list");
+        if (listHost) listHost.innerHTML = "";
+        (window as any).connectedPlayers = [];
+
+        if ((window as any).nostrManager) {
+            // DO NOT resetGame() here. We want to keep the selected ID.
+            const gameId = await (window as any).nostrManager.startHosting(selectedId);
+            
+            const display = document.getElementById('game-id-display');
+            if(display) display.innerText = gameId;
+
+            // Trigger Self-Join
+            const p1Name = (document.getElementById("player1name") as HTMLInputElement).value || "Host";
+            const p1Color = (document.getElementById("player1color") as HTMLSelectElement).value;
+            
+            if ((window as any).handlePlayerJoin) {
+                (window as any).handlePlayerJoin({
+                    name: p1Name,
+                    color: p1Color,
+                    pubkey: (window as any).nostrManager.pk
+                });
+            }
+            
+            updateStatus(`Resumed: ${gameId}`);
+        }
+    });
     
     // --- LOCAL BOT MODE ---
     btnLocal?.addEventListener('click', () => {
@@ -660,6 +847,24 @@ export function setupLobbyUI() {
             updateStatus("Hosting... Waiting for opponent.");
         }
     });
+    
+     // --- COPY BUTTON ---
+    const btnCopy = document.getElementById("btn-copy-id");
+    btnCopy?.addEventListener('click', async () => {
+        const idText = document.getElementById("game-id-display")?.innerText;
+        
+        if (idText && idText !== "Generating...") {
+            await Clipboard.write({
+                string: idText
+            });
+            
+            // Visual Feedback
+            const originalText = btnCopy.innerText;
+            btnCopy.innerText = "✅";
+            setTimeout(() => { btnCopy.innerText = originalText; }, 1500);
+        }
+    });
+
 
     // --- JOIN MODE ---
     btnJoin?.addEventListener('click', () => {
@@ -681,25 +886,41 @@ export function setupLobbyUI() {
         if(!gameId) return alert("Please enter a Game ID");
 
         if ((window as any).nostrManager) {
+            // 1. Reset State
+            (window as any).connectedPlayers = [];
+            const joinContainer = document.getElementById("join-lobby-container");
+            if(joinContainer) joinContainer.style.display = 'none';
+
+            // 2. Start Logic
+            updateStatus("Looking for Host...");
             await (window as any).nostrManager.joinGame(gameId);
-            updateStatus("Connected! Sending profile...Waiting for Host to start...");
             
-            // 1. Get Local Name/Color
+            // 3. Send Hello
             const p1Name = (document.getElementById("player1name") as HTMLInputElement).value;
             const p1Color = (document.getElementById("player1color") as HTMLSelectElement).value;
-            
-            if (startBtn) startBtn.style.display = 'none';
-            
-            // 2. Send "JOIN_REQUEST" to Host
+
             await (window as any).nostrManager.broadcastGameUpdate({
                 name: p1Name,
                 color: p1Color,
                 pubkey: (window as any).nostrManager.pk 
             }, 'JOIN_REQUEST');
-            
+
+            // 4. Request State
             setTimeout(() => {
-             (window as any).nostrManager.requestGameState();
-        }, 1000); // Small delay to ensure subscription is active 
+                 (window as any).nostrManager.requestGameState();
+            }, 1000);
+
+            // 5. SET TIMEOUT (The Fix for Invalid IDs)
+            if ((window as any).connectTimeout) clearTimeout((window as any).connectTimeout);
+            
+            (window as any).connectTimeout = setTimeout(() => {
+                // If updateLobbyUI hasn't run yet, this will fire
+                const players = (window as any).connectedPlayers;
+                if (!players || players.length === 0) {
+                    updateStatus("❌ Host not responding. Wrong ID?");
+                    alert("No Host found for this ID.\n\n1. Check the ID.\n2. Ensure Host is online.");
+                }
+            }, 6000); // 6 seconds timeout
         }
     });
 }
