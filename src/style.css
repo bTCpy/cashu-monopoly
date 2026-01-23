@@ -1136,3 +1136,7 @@ a[href*="github.com"] .social-icon:hover {
   user-select: none;  /* Prevent text selection during drag */
 }
 
+#cashout-modal {
+    z-index: 2147483647 !important; /* Max integer value to ensure it's on top of everything */
+}
+

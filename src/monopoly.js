@@ -1174,8 +1174,13 @@ function Game() {
 			$("#control").hide();
 			$("#board").hide();
 			
+			// Explicitly hide any lingering popups on the winner/host screen too
+			$("#popupwrap").hide();
+                	$("#popupbackground").hide();
+                
 			// 1. Get the winner's name from the remaining player object.
-			var winnerName = player[1].name;
+			var winner = player[1]; 
+			var winnerName = winner.name;
 
 			//$("#refresh").show();
 
@@ -1190,11 +1195,113 @@ function Game() {
 			// document.getElementById("refresh").innerHTML += "<br><br><div><textarea type='text' style='width: 980px;' onclick='javascript:select();' />" + text + "</textarea></div>";
 
 			//popup("<p>Congratulations, " + player[1].name + ", you have won the game.</p><div>");
-			triggerCashout(winnerName);
+			
+			// If we are playing Online...
+		        if (window.nostrManager && window.nostrManager.gameId) {
+		            if (window.nostrManager.isHost) {
+		            
+		                 // 1. Generate Raw Token
+                    		var rawToken = window.getEncodedToken ? window.getEncodedToken() : null;
+		                if (!rawToken) console.warn("⚠️ No raw token generated (Wallet empty or Demo Mode).");
+		                
+		                // 2. Encrypt Token (Async Operation)
+		                // We must use an async IIFE (Immediately Invoked Function Expression) 
+		                // or handle the promise because eliminatePlayer is synchronous.
+		                (async function() {
+		                    var finalPayloadToken = null;
+		                    var isEncrypted = false;
+
+		                    if (rawToken) {
+		                        if (winner.pubkey) {
+		                            try {
+		                                console.log("🔒 Encrypting token for:", winner.name);
+		                                // Encrypt using the helper we just made
+		                                finalPayloadToken = await window.nostrManager.encryptForPlayer(winner.pubkey, rawToken);
+		                                isEncrypted = true;
+		                            } catch (e) {
+		                                console.error("Encryption failed, fallback to raw (unsafe) or abort", e);
+		                                finalPayloadToken = rawToken; // Fallback or set null based on risk preference
+		                            }
+		                        } else {
+		                            console.warn("⚠️ Winner has no PubKey (Local Bot?). Sending raw.");
+		                            finalPayloadToken = rawToken;
+		                        }
+		                    }
+
+		                // 3. Prepare Secure Payload
+		                window.gameWinnerData = { 
+		                    winnerName: winnerName,
+		                    token: finalPayloadToken,
+		                    isEncrypted: isEncrypted // Flag to tell Joiner to decrypt
+		                };
+		            
+		                // 4. Broadcast
+		                broadcastGameState();
+		                window.nostrManager.sendAction('GAME_OVER', window.gameWinnerData);
+		            
+		                // 5. Host UI (Host can see raw token locally immediately)
+		                $("#popupwrap").hide();
+		                $("#popupbackground").hide();
+		                
+		                var hostName = document.getElementById("player1name").value;
+		                if (hostName === winnerName) {
+		                     triggerCashout(winnerName, rawToken); // Host reads raw local token
+		                } else {
+		                     // Show "Sent" message
+		                     var msgDiv = document.createElement("div");
+		                     msgDiv.style.cssText = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#1a1a1a; color:white; padding:30px; border:2px solid #f39c12; z-index:99999; text-align:center; border-radius:12px; box-shadow:0 0 30px rgba(0,0,0,0.8); min-width: 300px; font-family: sans-serif;";
+		                     msgDiv.innerHTML = `
+		                        <h1 style="color:#f39c12; margin-top:0;">GAME OVER</h1>
+		                        <p style="font-size:1.2em;">Winner: <strong>${winnerName}</strong></p>
+		                        <div style="background:#1e3a1e; padding:15px; border-radius:5px; margin:20px 0; border:1px solid #4CAF50;">
+		                            <p style="margin:0; font-weight:bold; color:#4CAF50;">🔒 Secure Prize Sent</p>
+		                            <p style="margin:5px 0 0 0; font-size:0.8em; color:#aaa;">Token encrypted & sent to winner.</p>
+		                        </div>
+		                        <button onclick="location.reload()" style="padding:10px 20px; font-weight:bold; cursor:pointer;">Main Menu</button>
+		                     `;
+		                     document.body.appendChild(msgDiv);
+		                }
+		            })(); // End Async Wrapper
+		        } 
+            } else {
+                // Local Offline Game
+                triggerCashout(winnerName);
+            }
+
 
 		} else {
-			play();
-		}
+			// CHECK: Did the HOST just resign?
+            	    	var myIndex = window.MY_PLAYER_INDEX || 1;
+			// In P2P, if I am the Host, I must keep the browser open.
+		        if (window.nostrManager && window.nostrManager.isHost) {
+		        
+		            // Check if I (Host) am still in the player list
+		            var hostStillPlaying = false;
+		            for(var k=1; k<=pcount; k++) {
+		               if (player[k].pubkey === window.nostrManager.pk) {
+		                   hostStillPlaying = true;
+		               }
+		            }
+		        
+		            if (!hostStillPlaying) {
+		                // I am dead, but others are playing.
+		                // 1. Show a non-blocking notification
+		                $("#landed").html("<div style='color:red; font-weight:bold;'>YOU RESIGNED. Spectator Mode Active.</div><div style='font-size:0.8em'>Do not close this window! The game server is running on your device.</div>");
+		            
+		                // 2. Hide controls so I can't mess anything up
+		                $("#control").find("input, button").prop("disabled", true).css("opacity", 0.5);
+		            
+		                // 3. Ensure loop continues
+		                play();
+		            
+		                // 4. Force Broadcast so Joiners see the new array order
+		                broadcastGameState();
+		                return;
+		            }
+		        }
+
+				play();
+			    }
 	};
 
 	this.bankruptcyUnmortgage = function() {
@@ -1235,6 +1342,28 @@ function Game() {
 	};
 
 	this.resign = function() {
+        // --- P2P INTERCEPTION START ---
+        if (!window.isExecutingRemote && window.nostrManager && window.nostrManager.gameId) {
+            var myIndex = window.MY_PLAYER_INDEX || 1;
+            
+            // If I am a Joiner, I need to confirm locally, then tell the Host.
+            if (myIndex !== 1) {
+                // Show local popup first
+                popup("<p>Are you sure you want to resign?</p>", function() {
+                    // If "Yes" is clicked:
+                    // 1. Close the popup
+                    $("#popupwrap").hide();
+                    $("#popupbackground").hide();
+                    
+                    // 2. Send the irrevocable action to Host
+                    window.nostrManager.sendAction('RESIGN');
+                }, "Yes/No");
+                return;
+            }
+        }
+        // --- P2P INTERCEPTION END ---
+
+        // Standard behavior (Host / Local Game)
 		popup("<p>Are you sure you want to resign?</p>", game.bankruptcy, "Yes/No");
 	};
 
@@ -1274,7 +1403,7 @@ function Game() {
 
 				if (p.creditor === 0) {
 					sq.mortgage = false;
-					game.addPropertyToAuctionQueue(i);
+					//game.addPropertyToAuctionQueue(i);
 					sq.owner = 0;
 				}
 			}
@@ -3290,6 +3419,7 @@ function setup() {
             p = player[pIndex]; 
             p.name = lobbyData.name;
             p.color = lobbyData.color.toLowerCase();
+            p.pubkey = lobbyData.pubkey; 
             p.money = Math.round(1500 * GAME_SCALE);
             p.human = true; 
             p.AI = null;
@@ -4175,6 +4305,21 @@ window.player = player;
 window.turn = turn;
 
 window.loadRemoteGameState = function(remoteState) {
+    // 1. Check if the Game is ALREADY flagged as over locally
+    if (window.gameIsOver) return;
+
+    // 2. --- FIX: Check if Remote State says Game is Over ---
+    if (remoteState.winnerData) {
+        console.log("🏆 State contains Winner Data. Triggering Game Over.");
+        
+        // Force the action handler to run with this data
+        if (window.handleRemoteAction) {
+            window.handleRemoteAction('GAME_OVER', remoteState.winnerData);
+        }
+        return; // STOP here. Do not render the board.
+    }
+
+    
     console.log("📥 Applying Remote State...");
 
     // 1. Force switch to board view if needed
@@ -4228,6 +4373,26 @@ window.loadRemoteGameState = function(remoteState) {
             }
 
             player[i] = newP;
+        }
+    }
+    
+    // AUTO-CORRECT MY INDEX
+    // If players were eliminated, my index might have shifted (e.g. 2 -> 1).
+    if (window.nostrManager && window.nostrManager.pk) {
+        var myPubkey = window.nostrManager.pk;
+        
+        // Find which player object belongs to me
+        // Start at 1 (0 is bank)
+        for (var k = 1; k < player.length; k++) {
+            if (player[k] && player[k].pubkey === myPubkey) {
+                // Found me! Update global index
+                window.MY_PLAYER_INDEX = k;
+                
+                // Update visuals to match new color/border
+                var quickStats = document.getElementById("quickstats");
+                if (quickStats) quickStats.style.borderColor = player[k].color;
+                break;
+            }
         }
     }
 
@@ -4338,26 +4503,49 @@ window.loadRemoteGameState = function(remoteState) {
         var myIndex = window.MY_PLAYER_INDEX || 2;
         var isMyTurn = (turn === myIndex);
 
+        // Select the specific "OK" button and any other buttons in the popup
+        var $closeBtn = $("#popupclose");
+        var $allBtns = $("#popuptext input[type='button'], #popup input[type='button']");
+
         if (isMyTurn && remoteState.popupVis !== 'none') {
-            // It's my turn, so I should be able to click OK.
-            
-            // The Host might have sent them as "disabled" because it wasn't the Host's turn.
-            // We must unlock them for the player whose turn it actually is.
-            $("#popupclose, #popupyes, #popupno")
-                .prop("disabled", false)
-                .css("opacity", "1.0")
-                .css("cursor", "pointer");
-            
-            $("#popupclose, #popupyes, #popupno").off("click").on("click", function() {
-                // Hide locally immediately for better UX
-                $(popupWrap).hide();
-                $(popupBg).hide();
-                // Tell Host to proceed
-                window.nostrManager.sendAction('POPUP_CLOSE');
+            // A. UNLOCK BUTTONS
+            // Host may have sent them as 'disabled'. We forcefully strip that.
+            $allBtns.removeAttr("disabled").prop("disabled", false);
+            $allBtns.css({ 
+                "opacity": "1.0", 
+                "cursor": "pointer", 
+                "pointer-events": "auto" 
             });
+
+            // B. RE-BIND "OK" BUTTON (Fixes the "Unclickable" issue)
+            // The original jQuery listener was lost during network transfer. We create a new one.
+            if ($closeBtn.length > 0) {
+                $closeBtn.off("click").on("click", function(e) {
+                    e.preventDefault();
+                    
+                    // 1. Hide locally immediately for instant feedback
+                    $(popupWrap).hide();
+                    $(popupBg).hide();
+                    
+                    // 2. Tell Host we clicked OK (so they can advance the game logic)
+                    if (window.nostrManager) {
+                        window.nostrManager.sendAction('POPUP_CLOSE');
+                    }
+                });
+            }
+            
+            // C. RE-BIND YES/NO BUTTONS (If they exist)
+            $("#popupyes, #popupno").off("click").on("click", function() {
+                 $(popupWrap).hide();
+                 $(popupBg).hide();
+                 // Usually these have specific actions, but closing is the baseline fallback
+                 window.nostrManager.sendAction('POPUP_CLOSE');
+            });
+
         } else {
-            // Not my turn? Keep them disabled.
-            $("#popupclose, #popupyes, #popupno").prop("disabled", true).css("opacity", 0.5);
+            // Not my turn? Visually disable them.
+            $allBtns.prop("disabled", true);
+            $allBtns.css({ "opacity": "0.5", "cursor": "not-allowed" });
         }
     }
     
@@ -4505,6 +4693,8 @@ function broadcastGameState() {
             turn: turn,
             pcount: pcount,
             
+            winnerData: window.gameWinnerData || null,
+            
             // Sync the HTML content of the game controls
             alertHTML: document.getElementById("alert").innerHTML,
             landedHTML: document.getElementById("landed").innerHTML,
@@ -4626,8 +4816,55 @@ window.handlePlayerJoin = function(data) {
 };
 
 // 2. Handle Actions (Remote Control)
-window.handleRemoteAction = function(action, payload) {
+window.handleRemoteAction = function(action, payload, senderPubkey) {
     console.log("🤖 Executing Remote Action:", action);
+    
+    // --- 1. VALIDATION LOGIC ---
+    // We must verify if the sender is allowed to act.
+    
+    var isAllowed = false;
+    
+    // IF we have the sender's PubKey (added in nostrGame.ts fix)
+    if (senderPubkey) {
+        // Find who this player is in our CURRENT array (accounting for shifts)
+        var actingPlayerIndex = -1;
+        
+        // Note: player array is 1-based (index 0 is 'the bank')
+        for (var i = 1; i <= pcount; i++) {
+            if (player[i].pubkey === senderPubkey) {
+                actingPlayerIndex = i;
+                break;
+            }
+        }
+        
+        if (actingPlayerIndex === -1) {
+            console.warn("⚠️ Unknown sender pubkey:", senderPubkey);
+            return; // Ignore strangers
+        }
+
+        // Check: Is it this player's turn?
+        // (Unless it's an AUCTION, where anyone can bid)
+        if (action.startsWith("AUCTION") || 
+            action === "GAME_OVER" || 
+            action === "TRADE_ACCEPT" || 
+            action === "TRADE_CANCEL" || 
+            action === "TRADE_PROPOSE") {
+            
+            isAllowed = true;
+            
+        } else if (actingPlayerIndex === turn) {
+            isAllowed = true;
+            console.log("✅ Authorized action from Player", actingPlayerIndex, "(" + player[actingPlayerIndex].name + ")");
+        } else {
+             console.warn("⚠️ Action blocked: Player", actingPlayerIndex, "tried to act, but it is Player", turn, "'s turn.");
+             return;
+        }
+    } else {
+        // Fallback for older versions/local tests without pubkey
+        isAllowed = true; 
+    }
+
+    if (!isAllowed) return;
     
     // FLAG: Tell game functions to bypass "My Turn" checks
     window.isExecutingRemote = true; 
@@ -4733,8 +4970,83 @@ window.handleRemoteAction = function(action, payload) {
                 // 3. Broadcast (Sends new Money/Property owners + tradeData: null)
                 setTimeout(broadcastGameState, 200);
                 break;
+            case 'GAME_OVER':
+                console.log("🏆 Game Over received. Locking State.");
+                
+                window.gameIsOver = true;
+                
+                $("#popupwrap").hide();
+                $("#popupbackground").hide();
+                $("#statswrap").hide();
+                $("#statsbackground").hide();
+                $("#trade").hide();
+                document.getElementById("popupwrap").style.display = "none";
+                document.getElementById("popupbackground").style.display = "none";
+                $("#control").hide();
+	        $("#board").hide();
+                
+                // 2. Start Async Logic (Required for Decryption)
+                (async function() {
+                    var myName = document.getElementById("player1name").value;
+                    var winnerName = payload.winnerName;
+                    var incomingToken = payload.token;
+                    var isEncrypted = payload.isEncrypted; // Check flag sent by Host
+                    
+                    // Variable to hold the final readable token
+                    var finalToken = incomingToken;
+
+                    if (myName === winnerName) {
+                        // --- I WON ---
+                        
+                        // A. Decrypt if needed
+                        if (incomingToken && isEncrypted) {
+                            try {
+                                console.log("🔐 Decrypting prize token...");
+                                finalToken = await window.nostrManager.decryptFromHost(incomingToken);
+                            } catch (e) {
+                                console.error("Decryption failed:", e);
+                                alert("Error: Could not decrypt the prize token. Check console.");
+                                return;
+                            }
+                        }
+
+                        // B. Show Cashout or Demo Screen
+                        if (finalToken && window.triggerCashout) {
+                            // Success: Show Modal with Decrypted Token
+                            window.triggerCashout(winnerName, finalToken);
+                        } else {
+                            // Demo Mode (No Token)
+                            var msgDiv = document.createElement("div");
+                            msgDiv.style.cssText = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#1a1a1a; color:white; padding:40px; border:2px solid #4CAF50; z-index:99999; text-align:center; border-radius:12px; box-shadow:0 0 30px rgba(0,0,0,0.8); min-width: 320px; font-family: sans-serif;";
+                            
+                            msgDiv.innerHTML = `
+                                <h1 style="color:#4CAF50; margin-top:0;">🎉 YOU WON! 🎉</h1>
+                                <p style="font-size:1.2em;">Congratulations, <strong>${winnerName}</strong>!</p>
+                                <p style="color:#aaa; margin: 20px 0;">(No prize token - Demo Mode)</p>
+                                <button onclick="location.reload()" style="padding:15px 30px; background:#4CAF50; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">Main Menu</button>
+                            `;
+                            document.body.appendChild(msgDiv);
+                        }
+                    } else {
+                        // --- I LOST ---
+                        var msgDiv = document.createElement("div");
+                        msgDiv.style.cssText = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#1a1a1a; color:white; padding:40px; border:2px solid #ff4444; z-index:99999; text-align:center; border-radius:12px; box-shadow:0 0 30px rgba(0,0,0,0.8); min-width: 320px; font-family: sans-serif;";
+                        
+                        msgDiv.innerHTML = `
+                            <h1 style="color:#ff4444; margin-top:0;">GAME OVER</h1>
+                            <div style="margin: 20px 0; border-top: 1px solid #444; border-bottom: 1px solid #444; padding: 20px 0;">
+                                <p style="font-size:1.1em; color:#aaa; margin:0 0 5px 0;">Winner</p>
+                                <p style="font-size:1.8em; font-weight:bold; color:#4CAF50; margin:0;">${winnerName}</p>
+                            </div>
+                            <button onclick="location.reload()" style="padding:15px 30px; background:#444; color:white; border:1px solid #666; border-radius:8px; font-weight:bold; cursor:pointer;">Return to Menu</button>
+                        `;
+                        document.body.appendChild(msgDiv);
+                    }
+                })();
+                break;    
             case 'RESIGN':
-                game.resign();
+                console.log("🏳️ Player Resigned.");
+                game.bankruptcy();
                 break;
         }
     } catch(e) {

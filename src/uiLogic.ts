@@ -42,6 +42,10 @@ export function initUiLogic() {
     // Attach Cashout Logic
     const copyBtn = document.getElementById("copy-btn");
     if(copyBtn) copyBtn.addEventListener('click', copyTokenToClipboard);
+    (window as any).getEncodedToken = getEncodedToken;
+    
+    // Add the Resync Button
+    addResyncButton();
     
     // Initial Calc
     updateTotal();
@@ -116,6 +120,7 @@ export function initUiLogic() {
         updateStatus(`Connected! You are Player ${(window as any).MY_PLAYER_INDEX}`);
     }
 };
+(window as any).getEncodedToken = getEncodedToken;
 }
 
 function loadHistoryUI() {
@@ -166,8 +171,10 @@ export async function joinGameUI() {
     }
 }
 
-export async function performCashOut(showModal: boolean, winnerName?: string) {
-    const token = getEncodedToken();
+export async function performCashOut(showModal: boolean, winnerName?: string, remoteToken?: string) {
+    // If we received a token from the Host (remoteToken), use it. 
+    // Otherwise, try to generate it from local wallet (Host case).
+    const token = remoteToken || getEncodedToken();
     
     // 1. Check Balance
     if (!token) {
@@ -197,6 +204,9 @@ export async function performCashOut(showModal: boolean, winnerName?: string) {
         }
         
         modal.style.display = "flex";
+        modal.style.zIndex = "2147483647"; // Max Int
+        modal.style.visibility = "visible";
+        modal.style.opacity = "1";
     }
 
     // 3. Auto-Copy
@@ -212,35 +222,37 @@ export async function performCashOut(showModal: boolean, winnerName?: string) {
         if (!isModalVisible) prompt("Copy this token:", token);
     }
 
-    // 4. Polling Logic
-    if (cashOutPoll) clearInterval(cashOutPoll);
-    
-    const balanceDisplay = document.getElementById('cashu-balance');
+    // 4. Polling Logic (Only run this on the machine that actually holds the wallet)
+    // If we are using a remoteToken, we are the Joiner, so we can't poll the wallet state.
+    if (!remoteToken) {
+        if (cashOutPoll) clearInterval(cashOutPoll);
+        
+        const balanceDisplay = document.getElementById('cashu-balance');
 
-    cashOutPoll = setInterval(async () => {
-        try {
-            const { spentCount, remainingBalance } = await cleanupSpentTokens();
+        cashOutPoll = setInterval(async () => {
+            try {
+                const { spentCount, remainingBalance } = await cleanupSpentTokens();
 
-            if (spentCount > 0) {
-                if (balanceDisplay) {
-                    balanceDisplay.textContent = `Balance: ${remainingBalance} sats`;
-                }
-
-                if (remainingBalance === 0) {
-                    clearInterval(cashOutPoll);
-                    if (modal) modal.style.display = "none";
-                    alert("Cash out successful! Your wallet is now empty.");
-                    
-                    if (showModal) {
-                        window.location.reload();
+                if (spentCount > 0) {
+                    if (balanceDisplay) {
+                        balanceDisplay.textContent = `Balance: ${remainingBalance} sats`;
                     }
-                    
+
+                    if (remainingBalance === 0) {
+                        clearInterval(cashOutPoll);
+                        if (modal) modal.style.display = "none";
+                        alert("Cash out successful! Your wallet is now empty.");
+                        
+                        if (showModal) {
+                            window.location.reload();
+                        }
+                    }
                 }
+            } catch (e) {
+                console.error("Polling error:", e);
             }
-        } catch (e) {
-            console.error("Polling error:", e);
-        }
-    }, 3000);
+        }, 3000);
+    }
 }
 
 // 1. UI: Calculate Totals
@@ -307,67 +319,7 @@ async function confirmAndStart() {
         });
     }
 }
-/* async function confirmAndStart() {
-    const playerCount = parseInt(pInput.value) || 2;
-    const amountPerPlayer = parseInt(aInput.value) || 1500;
-    const totalSats = playerCount * amountPerPlayer;
 
-    let selectedMint = mintSelect.value;
-    if (selectedMint === "custom") selectedMint = customInput.value.trim();
-
-    // UI Update
-    configStep.style.display = "none";
-    paymentStep.style.display = "flex";
-    document.getElementById("scan-instruction")!.innerText = `Scan to deposit ${totalSats} Sats`;
-    statusText.innerText = "Connecting to Mint...";
-
-    try {
-        // A. Connect to Mint (Replaces Python Wallet init)
-        const connected = await connectToMint(selectedMint);
-        if (!connected) throw new Error("Could not connect to mint");
-
-        // B. Get Invoice (Replaces /api/buyin)
-        statusText.innerText = "Requesting Invoice...";
-        const { quote, request } = await requestMint(totalSats);
-        currentQuoteId = quote;
-
-        // C. Show QR (Generated locally now!)
-        const qrDataUrl = await QRCode.toDataURL(request);
-        qrImage.src = qrDataUrl;
-        qrImage.style.display = "block";
-        
-        statusText.innerText = "Waiting for payment...";
-        
-        // D. Start Polling
-        startPolling(totalSats);
-
-    } catch (e: any) {
-        console.error(e);
-        statusText.innerText = "Error: " + e.message;
-        statusText.style.color = "red";
-        setTimeout(() => {
-            paymentStep.style.display = "none";
-            configStep.style.display = "block";
-        }, 3000);
-    }
-} */
-
-/* 3. Logic: Poll for Payment
-function startPolling(totalSats: number) {
-    if (pollInterval) clearInterval(pollInterval);
-
-    pollInterval = setInterval(async () => {
-        if (!currentQuoteId) return;
-
-        // Replaces /api/check_start
-        const result = await checkAndMint(currentQuoteId, totalSats);
-
-        if (result.success) {
-            clearInterval(pollInterval);
-            startGameSuccess(totalSats);
-        }
-    }, 2000);
-} */
 
 // 4. Logic: Success & Game Launch
 function startGameSuccess(totalSats: number) {
@@ -426,18 +378,36 @@ async function skipPaymentDemo() {
 
 // Cashout Logic
 function copyTokenToClipboard() {
-    const token = getEncodedToken();
-    if (!token) {
+    // 1. Get the text box element
+    const tokenBox = document.getElementById("token-display") as HTMLTextAreaElement;
+    
+    // 2. PRIORITY: Check if there is already a token in the box (e.g., sent by Host)
+    let tokenToCopy = tokenBox ? tokenBox.value.trim() : "";
+
+    // 3. FALLBACK: If box is empty, try to generate from local wallet (e.g., Local Game or Host cashout)
+    if (!tokenToCopy) {
+        // @ts-ignore
+        tokenToCopy = (typeof getEncodedToken === 'function') ? getEncodedToken() : null;
+    }
+
+    // 4. If still empty, THEN show error
+    if (!tokenToCopy) {
         alert("No funds to cash out!");
         return;
     }
     
-    const tokenBox = document.getElementById("token-display") as HTMLTextAreaElement;
-    if (tokenBox) tokenBox.value = token;
+    // Ensure the box is populated (in case we generated it just now from local wallet)
+    if (tokenBox) tokenBox.value = tokenToCopy;
 
-    navigator.clipboard.writeText(token).then(() => {
+    // 5. Perform the Copy
+    navigator.clipboard.writeText(tokenToCopy).then(() => {
         const btn = document.getElementById("copy-btn");
-        if (btn) btn.innerText = "✅ Copied!";
+        if (btn) {
+            const originalText = btn.innerText;
+            btn.innerText = "✅ Copied!";
+            // Reset button text after 2 seconds
+            setTimeout(() => { btn.innerText = originalText; }, 2000);
+        }
     }).catch(err => {
         console.error('Failed to copy: ', err);
         // Fallback for older webviews if needed
@@ -1004,7 +974,77 @@ async function showInvoiceModal(invoice: string, onClose?: () => void) {
     return modal;
 }
 
+function addResyncButton() {
+    // Create the button
+    const btn = document.createElement("button");
+    btn.id = "btn-resync-game";
+    btn.innerHTML = "🔄";
+    btn.title = "Resync Game State (Fix Stuck Screen)";
+    
+    // Style it to float top-right, but below the money bar
+    Object.assign(btn.style, {
+        position: "fixed",
+        top: "70px", // Below the money bar
+        right: "10px",
+        zIndex: "9000",
+        width: "40px",
+        height: "40px",
+        borderRadius: "50%",
+        border: "2px solid #fff",
+        background: "#2196F3",
+        color: "white",
+        fontSize: "20px",
+        cursor: "pointer",
+        boxShadow: "0 2px 5px rgba(0,0,0,0.3)",
+        display: "none" // Hidden by default (lobby)
+    });
+
+    // Hover effect
+    btn.onmouseover = () => { btn.style.background = "#1976D2"; };
+    btn.onmouseout = () => { btn.style.background = "#2196F3"; };
+
+    // Click Action
+    btn.onclick = () => {
+        // Visual feedback
+        btn.innerHTML = "⏳";
+        btn.style.transform = "rotate(360deg)";
+        btn.style.transition = "transform 1s";
+
+        // Request State
+        if ((window as any).nostrManager) {
+            console.log("🔄 Manual Resync Requested...");
+            (window as any).nostrManager.requestGameState();
+        }
+
+        // Reset icon after 1.5s
+        setTimeout(() => {
+            btn.innerHTML = "🔄";
+            btn.style.transform = "none";
+            btn.style.transition = "none";
+        }, 1500);
+    };
+
+    document.body.appendChild(btn);
+
+    // LOGIC TO SHOW/HIDE BUTTON
+    // We only want to show this when the game board is visible
+    setInterval(() => {
+        const board = document.getElementById("board");
+        const setup = document.getElementById("setup");
+        
+        if (board && setup) {
+            if (board.style.display !== "none" && setup.style.display === "none") {
+                btn.style.display = "block";
+            } else {
+                btn.style.display = "none";
+            }
+        }
+    }, 1000);
+}
+
 console.log("Current Quote ID:", currentQuoteId);
-(window as any).triggerCashout = function(name: string) {
-     performCashOut(true, name); 
+(window as any).triggerCashout = function(name: string, token: string) {
+     performCashOut(true, name, token); 
 };
+
+
