@@ -642,10 +642,26 @@ export function setupLobbyUI() {
     const btnHost = document.getElementById('btn-host-game');
     const btnJoin = document.getElementById('btn-join-game');
     
+    const walletSection = document.querySelector('.wallet-section') as HTMLElement;
+    const resumePanel = document.getElementById('resume-panel');
+    
+    let warningBox: HTMLElement | null = null;
+    document.querySelectorAll('.disclaimer-box').forEach((el) => {
+        if (el.innerHTML.includes('Important Warning')) {
+            warningBox = el as HTMLElement;
+        }
+    }); 
+    
     const hostPanel = document.getElementById('host-panel');
     const joinPanel = document.getElementById('join-panel');
     const startBtn = document.getElementById('btn-start-game');
     const p2AiSelect = document.getElementById('player2ai') as HTMLSelectElement;
+    
+    const shouldShowResume = () => {
+        const select = document.getElementById("history-select") as HTMLSelectElement;
+        // Check if select has more than the default placeholder option
+        return select && select.options.length > 1;
+    };
 
     // 2. Resume Button Logic
     const btnResume = document.getElementById("btn-resume-game");
@@ -733,6 +749,8 @@ export function setupLobbyUI() {
                 return alert("Invalid Game ID. It should be at least 8 characters.");
             }
         }
+        
+        if(walletSection) walletSection.style.display = 'block';
 
         // Switch UI to Host Mode
         if(hostPanel) hostPanel.style.display = 'block';
@@ -773,6 +791,10 @@ export function setupLobbyUI() {
         if(hostPanel) hostPanel.style.display = 'none';
         if(joinPanel) joinPanel.style.display = 'none';
         if(startBtn) startBtn.style.display = 'block';
+        if(walletSection) walletSection.style.display = 'block';
+        if(warningBox) warningBox.style.display = 'block'; 
+        
+        if(resumePanel && shouldShowResume()) resumePanel.style.display = 'block';
 
         // Logic: Set Player 2 to AI
         if(p2AiSelect) p2AiSelect.value = "1"; // 1 = Bot
@@ -784,6 +806,10 @@ export function setupLobbyUI() {
         if(hostPanel) hostPanel.style.display = 'block';
         if(joinPanel) joinPanel.style.display = 'none';
         if(startBtn) startBtn.style.display = 'block';
+        if(walletSection) walletSection.style.display = 'block';
+        if(warningBox) warningBox.style.display = 'block'; 
+        
+        if(resumePanel && shouldShowResume()) resumePanel.style.display = 'block';
         
         // FIX: Clear previous lobby data
         const listHost = document.getElementById("lobby-player-list");
@@ -841,6 +867,10 @@ export function setupLobbyUI() {
         if(joinPanel) joinPanel.style.display = 'block';
         if(hostPanel) hostPanel.style.display = 'none';
         if(startBtn) startBtn.style.display = 'none'; // Joiners wait for host
+        if(walletSection) walletSection.style.display = 'none';
+        
+        if(resumePanel) resumePanel.style.display = 'none';
+        if(warningBox) warningBox.style.display = 'none'; 
         
         (window as any).MY_PLAYER_INDEX = 2; 
         // Logic: Set Player 2 to Human (The host)
