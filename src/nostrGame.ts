@@ -9,8 +9,9 @@ const RELAYS = [
     'wss://relay.snort.social'
 ];
 
-interface GameHistoryItem {
+export interface GameHistoryItem {
     id: string;
+    type?: 'local' | 'online';
     timestamp: string;
 }
 
@@ -31,13 +32,19 @@ export class NostrGameManager {
     getGameHistory(): GameHistoryItem[] {
         try {
             const raw = localStorage.getItem('monopoly_game_history');
-            return raw ? JSON.parse(raw) : [];
+            const history = raw ? JSON.parse(raw) : [];
+            
+            // Fix Legacy Data: If 'type' is missing, assume it is 'online'
+            return history.map((item: any) => ({
+                ...item,
+                type: item.type || 'online'
+            }));
         } catch (e) {
             return [];
         }
     }
 
-    saveGameToHistory(gameId: string) {
+    saveGameToHistory(gameId: string, type: 'local' | 'online' = 'online') {
         let history = this.getGameHistory();
         
         // 1. Remove this ID if it already exists (so we can move it to top)
@@ -46,6 +53,7 @@ export class NostrGameManager {
         // 2. Add to top with current time
         history.unshift({
             id: gameId,
+            type: type,
             timestamp: new Date().toLocaleString()
         });
         
