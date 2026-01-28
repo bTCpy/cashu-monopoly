@@ -137,6 +137,11 @@ function Game() {
 			roll();
 		}
 		setTimeout(broadcastGameState, 100);
+		
+		// If it is a local game (no nostr manager active), save progress
+		if (!window.nostrManager || !window.nostrManager.gameId) {
+		    saveLocalGameState();
+        	}
 	};
 
 	this.getDie = function(die) {
@@ -1624,6 +1629,21 @@ function popup(HTML, action, option) {
 		}).on("click", action);
 
 	}
+	
+	var popupEl = document.getElementById("popup");
+        if (player && player[turn]) {
+	    var pColor = player[turn].color;
+	
+	    // Apply the color
+	    popupEl.style.border = "5px solid " + pColor;
+	
+	    // Optional: Add a subtle glow for better visibility
+	    popupEl.style.boxShadow = "0 0 15px " + pColor;
+        } else {
+	    // Fallback for system messages (before game starts)
+	    popupEl.style.border = "2px solid black";
+	    popupEl.style.boxShadow = "none";
+        }
 
 	// 4. SHOW POPUP (Explicit Display Mode)
 	var pWrap = document.getElementById("popupwrap");
@@ -3420,7 +3440,7 @@ function setup() {
         document.getElementById("playernumber").value = pcount;
         
         if (window.nostrManager.saveGameToHistory) {
-            window.nostrManager.saveGameToHistory(window.nostrManager.gameId);
+            window.nostrManager.saveGameToHistory(window.nostrManager.gameId, 'online');
         }        
 
         for (var i = 0; i < pcount; i++) {
@@ -3440,6 +3460,11 @@ function setup() {
     // BRANCH: LOCAL / AI SETUP
     // ============================================================
     else {
+        // If we are NOT resuming an existing local game, make a new ID
+        if (!window.localGameId) {
+            window.localGameId = "local_" + Math.floor(Math.random() * 1000000);
+        }
+        
         pcount = parseInt(document.getElementById("playernumber").value, 10);
         playerArray = new Array(pcount);
         playerArray.randomize(); 
@@ -4373,15 +4398,23 @@ window.loadRemoteGameState = function(remoteState) {
             
             // Copy remaining data (money, position, etc.)
             for (var key in raw) {
-                if (raw.hasOwnProperty(key) && key !== "name" && key !== "color") {
+                if (raw.hasOwnProperty(key) && key !== "name" && key !== "color" && key !== "AI") {
                     newP[key] = raw[key];
                 }
             }
             
             // If it's an AI, we might need to re-attach the AI brain
-            if (!raw.human && !newP.AI && window.AITest) {
+            if (!raw.human && window.AITest) {
+                 // 1. Create fresh instance (Restores functions: beforeTurn, onLand, etc.)
                  newP.AI = new window.AITest(newP);
+                 
+                 // 2. Restore state (Restores memory: alertList)
+                 if (raw.AI && raw.AI.alertList) {
+                     newP.AI.alertList = raw.AI.alertList;
+                 }
             }
+            
+            if (raw.pubkey) newP.pubkey = raw.pubkey; 
 
             player[i] = newP;
         }
@@ -4506,6 +4539,14 @@ window.loadRemoteGameState = function(remoteState) {
         // 1. Update Content
         if (remoteState.popupHTML) {
             document.getElementById("popuptext").innerHTML = remoteState.popupHTML;
+        }
+        
+        // Re-apply border color based on the synced turn
+        var popupEl = document.getElementById("popup");
+        if (player && player[turn]) {
+            var pColor = player[turn].color;
+            popupEl.style.border = "5px solid " + pColor;
+            popupEl.style.boxShadow = "0 0 15px " + pColor;
         }
         
         // 2. Show/Hide
@@ -4695,6 +4736,32 @@ window.loadRemoteGameState = function(remoteState) {
     
     //Force re-center on player (optional)
     centerOnPlayer(); 
+    
+    // If we just loaded the state and it is an AI's turn, we must trigger their logic manually.
+    // We only do this if WE are the one running the game loop (Local or Host).
+    
+    var isLocalGame = !window.nostrManager || !window.nostrManager.gameId;
+    var isHost = window.nostrManager && window.nostrManager.isHost;
+
+    if (isLocalGame || isHost) {
+        var p = player[turn];
+        
+        // If it's an AI, and they haven't finished their turn (dice not rolled or just starting)
+        if (p && !p.human && !p.money >= 0) {
+            console.log("🤖 Kickstarting AI turn after load...");
+            
+            // We use the same delay/logic as play() to ensure smooth UX
+            setTimeout(function() {
+                // Ensure the AI object exists and has methods (re-hydrated above)
+                if (p.AI && typeof p.AI.beforeTurn === 'function') {
+                    // Standard AI Loop: Do business -> Roll Dice (game.next)
+                    if (!p.AI.beforeTurn()) {
+                        game.next();
+                    }
+                }
+            }, 1000);
+        }
+    }
 };
 
 // === MULTIPLAYER HELPER ===
@@ -4705,6 +4772,7 @@ function broadcastGameState() {
         var bidInput = document.getElementById("bid");
 
         var state = {
+            gameType: 'online',
             players: player,
             squares: square,
             turn: turn,
@@ -4756,6 +4824,37 @@ function broadcastGameState() {
         localStorage.setItem(saveKey, JSON.stringify(state));
 
         window.nostrManager.broadcastGameUpdate(state, 'STATE');
+    }
+}
+
+function saveLocalGameState() {
+    // Only save if we have a local Game ID (we will generate one in setup)
+    if (!window.localGameId) return;
+
+    var state = {
+        gameType: 'local',
+        timestamp: new Date().toLocaleString(),
+        players: player,
+        squares: square,
+        turn: turn,
+        pcount: pcount,
+        areDiceRolled: game.isDiceRolled(),
+        doublecount: window.doublecount || 0,
+        // UI States
+        alertHTML: document.getElementById("alert").innerHTML,
+        landedHTML: document.getElementById("landed").innerHTML,
+        landedVis: document.getElementById("landed").style.display,
+        popupHTML: document.getElementById("popuptext").innerHTML,
+        popupVis: document.getElementById("popupwrap").style.display || "none",
+        nextBtnVal: document.getElementById("nextbutton").value,
+        nextBtnDisabled: document.getElementById("nextbutton").disabled
+    };
+
+    var saveKey = 'monopoly_state_' + window.localGameId;
+    localStorage.setItem(saveKey, JSON.stringify(state));
+    
+    if (window.nostrManager && window.nostrManager.saveGameToHistory) {
+        window.nostrManager.saveGameToHistory(window.localGameId, 'local');
     }
 }
 
