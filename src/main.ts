@@ -8,6 +8,7 @@ import './classicedition.js'
 import './ai.js'
 import './monopoly.js'
 import { initUiLogic, setupLobbyUI, nostrManager, initWalletUi } from './uiLogic'; 
+import { getBalance } from './walletManager';
 
 // Declare legacy functions that exist on window
 declare global {
@@ -88,6 +89,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnStart = document.getElementById("btn-start-game");
     if (btnStart) {
         btnStart.addEventListener('click', async () => {
+            const currentBalance = getBalance();
+            
+            if (currentBalance <= 0) {
+                alert("⚠️ Wallet Empty!\n\nYou must fund your Cashu wallet before starting the game.\n\nPlease use the 'Cashu Wallet' section below to mint tokens.");
+                
+                // Optional: Scroll to wallet section
+                const walletSection = document.querySelector('.wallet-section');
+                if (walletSection) walletSection.scrollIntoView({ behavior: 'smooth' });
+                
+                return; // STOP execution. Do not start game.
+            }
+            
             const hostPanel = document.getElementById('host-panel');
             const joinPanel = document.getElementById('join-panel');
             
