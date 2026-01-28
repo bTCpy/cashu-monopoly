@@ -1,9 +1,17 @@
 body {
 	background: #121212;
 	margin: 0px;
-	min-width: 1075px;
+    
+        width: 100%;
+        min-width: 0; 
+    
 	font-family: 'Segoe UI', 'Roboto', Helvetica, Arial, sans-serif;
 }
+
+#setup *, .wallet-section *, .lobby-card *, .player-input * {
+    box-sizing: border-box;
+}
+
 
 td {
 	font-size: 11px;
@@ -13,12 +21,6 @@ td {
 	background-color: #1e1e1e; 
 	color: #ffba71;
 	text-align: center;
-}
-
-#setup {
-	display: none;
-	margin: 15px;
-	color: #F7931A;
 }
 
 #moneybar {
@@ -82,6 +84,7 @@ td {
 	margin: 25px;
 	float: left;
 	overflow: auto;
+	min-width: 994px; 
 }
 
 #board-container {
@@ -327,9 +330,10 @@ td {
 	text-align: center;
 	word-wrap: break-word;
 	line-height: 1.5;
-	border: 2px solid black;
+	border: 5px solid black;
 	border-radius: 10px;
-	background-color: aliceblue; 
+	background-color: #E5D7B8; 
+	transition: border-color 0.3s ease, box-shadow 0.3s ease;
 	display: block;
 	z-index: 13;
 	margin: auto;
@@ -890,12 +894,13 @@ a[href*="github.com"] .social-icon:hover {
     top: 0; left: 0;
     width: 100%; 
     height: 100%;
+    margin: 0; 
+    
     background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%);
     z-index: 9999;
     font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     color: white;
     
-    /* --- THE FIX START --- */
     display: flex;
     flex-direction: column;
     align-items: center;      /* Center horizontally */
@@ -903,7 +908,7 @@ a[href*="github.com"] .social-icon:hover {
     overflow-y: auto;         /* Allow vertical scrolling */
     padding: 40px 20px;       /* Add breathing room at top and bottom */
     box-sizing: border-box;
-    /* --- THE FIX END --- */
+
 }
 
 /* 2. The Game Lobby Card */
@@ -1046,6 +1051,12 @@ a[href*="github.com"] .social-icon:hover {
     text-shadow: 0 0 10px rgba(255, 153, 0, 0.3);
 }
 
+#history-select {
+    width: auto !important; /* Stop it from forcing 100% width */
+    min-width: 0;           /* Allow it to shrink if the screen is very small */
+    flex: 1;                /* Ensure it fills available space properly */
+}
+
 @media only screen and (max-width: 1000px), only screen and (max-height: 900px) {
 
     /* 1. Pin Control Panel to Bottom of Screen */
@@ -1139,4 +1150,3 @@ a[href*="github.com"] .social-icon:hover {
 #cashout-modal {
     z-index: 2147483647 !important; /* Max integer value to ensure it's on top of everything */
 }
-
