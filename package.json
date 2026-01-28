@@ -17,6 +17,7 @@
     "vite": "^7.2.4"
   },
   "dependencies": {
+    "@capacitor-community/keep-awake": "^8.0.0",
     "@capacitor/android": "^8.0.0",
     "@capacitor/clipboard": "^8.0.0",
     "@capacitor/core": "^8.0.0",
