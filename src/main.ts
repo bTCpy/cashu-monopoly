@@ -1,3 +1,4 @@
+import { KeepAwake } from '@capacitor-community/keep-awake';
 import $ from 'jquery';
 (window as any).$ = $;
 (window as any).jQuery = $;
@@ -22,8 +23,15 @@ declare global {
 // Track host mode: 'new' or 'resume'
 let hostMode: 'new' | 'resume' = 'new';
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     console.log("🚀 Cashu Monopoly Starting...");
+    
+    try {
+        await KeepAwake.keepAwake();
+        console.log("💡 Screen Wake Lock active");
+    } catch (e) {
+        console.error("Failed to acquire Wake Lock:", e);
+    }
     
     // Initialize the Wallet UI listeners (Buy-in, Mint selection, etc.)
     initUiLogic();
