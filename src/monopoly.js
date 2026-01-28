@@ -83,6 +83,28 @@ window.tradeMoneyOnChange = function(e) {
 	return true;
 };
 
+window.bindTradeListeners = function() {
+    var lMoney = document.getElementById("trade-leftp-money");
+    var rMoney = document.getElementById("trade-rightp-money");
+    
+    var handler = window.tradeMoneyOnChange;
+    var keyHandler = window.tradeMoneyOnKeyDown;
+
+    if (lMoney) { 
+        lMoney.oninput = handler; // <--- Add oninput
+        lMoney.onchange = handler; 
+        lMoney.onkeydown = keyHandler; 
+    }
+    if (rMoney) { 
+        rMoney.oninput = handler; // <--- Add oninput
+        rMoney.onchange = handler; 
+        rMoney.onkeydown = keyHandler; 
+    }
+    
+    // Also bind checkboxes
+    $("#trade input[type='checkbox']").off("change").on("change", handler);
+};
+
 
 function Game() {
 	var die1;
@@ -801,10 +823,13 @@ function Game() {
 		$("#board").hide();
 		$("#control").hide();
 		$("#trade").show();
-		$("#proposetradebutton").show();
-		$("#canceltradebutton").show();
+		$("#proposetradebutton").show().prop("disabled", false);
+		$("#canceltradebutton").show().prop("disabled", false);
 		$("#accepttradebutton").hide();
 		$("#rejecttradebutton").hide();
+		
+		// Unlock inputs (Money/Checkboxes) so the user can actually use the menu
+        	$("#trade input, #trade select").prop("disabled", false);
 
 		if (tradeObj instanceof Trade) {
 			writeTrade(tradeObj);
@@ -818,6 +843,7 @@ function Game() {
 
 			resetTrade(initiator, recipient, true);
 		}
+		if (window.bindTradeListeners) window.bindTradeListeners();
 	};
 	
 	
@@ -859,6 +885,15 @@ function Game() {
 		$("#board").show();
 		$("#control").show();
 		$("#trade").hide();
+		
+		// Force re-enable the Propose button and hide others for the next time the window opens
+		$("#proposetradebutton").show().prop("disabled", false);
+		$("#canceltradebutton").show().prop("disabled", false);
+		$("#accepttradebutton").hide();
+		$("#rejecttradebutton").hide();
+		
+		// Re-enable inputs for the local user
+		$("#trade input, #trade select").prop("disabled", false);
 
 
 		if (!player[turn].human) {
@@ -945,7 +980,7 @@ function Game() {
 			return false;
 		}
 
-		if (showAlerts && !confirm(initiator.name + ", are you sure you want to make this exchange with " + recipient.name + "?")) {
+		if (showAlerts && !confirm("Are you sure you want to make this exchange?")) {
 			return false;
 		}
 
@@ -1031,13 +1066,52 @@ function Game() {
 		    }
 
 		    var myIndex = window.MY_PLAYER_INDEX || 1;
+		    var localTrade = readTrade();
+            	    var finalTrade = localTrade;
+            	    
+            	    // --- FIX: FORCE IDENTITY CHECK ---
+		    // If the trade read from UI says Initiator is NOT me, I am making a Counter-Offer.
+		    // I must become the Initiator.
+		    if (localTrade.getInitiator().index !== myIndex) {
+		        console.log("🔄 Counter-Offer detected. Swapping roles.");
+		        
+		        // 1. Swap Players
+		        var newInitiator = player[myIndex]; // Me
+		        var newRecipient = localTrade.getInitiator(); // The person I'm replying to
+		        
+		        // 2. Flip Properties
+		        // In UI: Checked Left = 1 (Offered by current Left).
+		        // If I swap roles, what was "Offered by Left" becomes "Requested by Me" (if Left was me?)
+		        // Actually, readTrade() uses currentInitiator.
+		        // If I am Recipient (Right side), and I check a box on Left Side (Host's property)...
+		        // readTrade says: Property[i] = 1 (Offered).
+		        // But it's actually Requested.
+		        
+		        // Simpler Logic:
+		        // Just flip the values. 1 -> -1, -1 -> 1.
+		        var reversedProps = [];
+		        for (var i = 0; i < 40; i++) {
+		            reversedProps[i] = -localTrade.getProperty(i);
+		        }
+		        var revCC = -localTrade.getCommunityChestJailCard();
+		        var revChance = -localTrade.getChanceJailCard();
+		        
+		        // 3. Flip Money
+		        // If UI says Left pays 100. Money = 100.
+		        // If I become Left, I pay 100. Money is still 100? 
+		        // No, 'money' is always relative to Initiator.
+		        // If Original Initiator offered 100. Money = 100.
+		        // Now I (New Initiator) want 100. Money = -100.
+		        var revMoney = -localTrade.getMoney();
+
+		        finalTrade = new Trade(newInitiator, newRecipient, revMoney, reversedProps, revCC, revChance);
+		    }
 
 		    // --- CASE A: JOINER (Player 2+) ---
 		    // Send request to Host and stop.
-		    if (!window.nostrManager.isHost) {
+		    if (myIndex !== 1) {
 		        try {
-		            var localTrade = readTrade();
-		            var payload = window.serializeTrade(localTrade);
+		            var payload = window.serializeTrade(finalTrade);
 		            window.nostrManager.sendAction('TRADE_PROPOSE', payload);
 		        } catch(e) { console.error(e); }
 		        return;
@@ -1048,16 +1122,27 @@ function Game() {
 		    // We do NOT use the standard fallthrough logic because that is for Hotseat (swapping turns).
 		    // We want to lock the Host UI and show the proposal to the Joiner.
 		    try {
-		        var hostTrade = readTrade();
+		       
 		        
 		        // 1. Save as Active Trade
-		        window.currentActiveTrade = hostTrade;
+		        window.currentActiveTrade = finalTrade;
+		        
+		        // If roles swapped, redraw so Host appears on Left
+		        if (finalTrade !== localTrade) {
+		            writeTrade(finalTrade);
+		        }
+		        
+		        setTimeout(function() {
+		        
+		        // We use :not([type='button']) so we don't kill the control buttons
+                	$("#trade input:not([type='button']), #trade select").prop("disabled", true);
 		        
 		        // 2. Update Host UI to "Waiting" state (Can only Cancel)
 		        $("#proposetradebutton").hide();
 		        $("#accepttradebutton").hide();
 		        $("#rejecttradebutton").hide();
-		        $("#canceltradebutton").show().prop("disabled", false);
+		        $("#canceltradebutton").show().prop("disabled", false).css("opacity", "1.0")
+		        }, 0);
 		        
 		        // 3. Broadcast so Joiner sees the window open
 		        broadcastGameState();
@@ -1113,7 +1198,7 @@ function Game() {
 			return false;
 		}
 
-		if (initiator.human && !confirm(initiator.name + ", are you sure you want to make this offer to " + recipient.name + "?")) {
+		if (initiator.human && !confirm("Are you sure you want to make this offer?")) {
 			return false;
 		}
 
@@ -4177,7 +4262,8 @@ window.addEventListener('resize', function() {
         const setupScreen = document.getElementById("setup"); 
         if (!control) return;
         
-        if (setupScreen.style.display !== "none") {
+        if ((setupScreen && setupScreen.style.display !== "none") || 
+            (tradeScreen && tradeScreen.style.display !== "none")) {
             control.style.display = "none";
             return; 
         }
@@ -4213,20 +4299,44 @@ window.addEventListener('resize', function() {
             // MOBILE MODE
             // 1. Force the Floating Widget layout
             control.style.position = "fixed";
-            control.style.display = "flex"; // Ensure it uses Flexbox for mobile layout
+            control.style.display = "flex";
             control.style.zIndex = "5000";
             control.style.width = "fit-content";
             control.style.height = "fit-content";
-            control.style.touchAction = "none"; // Required for dragging
+            control.style.touchAction = "none";
             
-            // 2. Snap to default position IF it has no coordinates
-            // (Prevents it from disappearing off-screen if switching views)
-            if (!control.style.top && !control.style.bottom) {
-                control.style.bottom = "10px";
-                control.style.left = "10px";
-                control.style.top = "";
-                control.style.right = "";
+            // 2. Get current dimensions
+            const rect = control.getBoundingClientRect();
+            const winH = window.innerHeight;
+            const winW = window.innerWidth;
+            
+            // 3. Calculate Boundaries (Allow 10px padding)
+            // The maximum Y value is (Screen Height - Panel Height - 10px)
+            const maxY = winH - rect.height - 10;
+            const maxX = winW - rect.width - 10;
+            
+            // 4. Get current absolute top/left from style (parse integer)
+            // If style.top is empty (e.g., initial load), rely on rect
+            let currentTop = parseInt(control.style.top) || rect.top;
+            let currentLeft = parseInt(control.style.left) || rect.left;
+
+            // 5. CLAMP Y-AXIS (Fixes the disappearing issue)
+            if (currentTop > maxY) {
+                // If panel is below the new bottom edge, pull it up
+                control.style.top = Math.max(10, maxY) + "px";
+                control.style.bottom = "auto"; // Critical: unset bottom
             }
+            
+            // 6. CLAMP X-AXIS
+            if (currentLeft > maxX) {
+                // If panel is past the new right edge, pull it left
+                control.style.left = Math.max(10, maxX) + "px";
+                control.style.right = "auto";
+            }
+            
+            // 7. Safety Fallback: Ensure it's not off the top/left
+            if (currentTop < 0) control.style.top = "10px";
+            if (currentLeft < 0) control.style.left = "10px";
         }
     }, 100);
 });
@@ -4660,16 +4770,29 @@ window.loadRemoteGameState = function(remoteState) {
         var myIndex = window.MY_PLAYER_INDEX || 2;
         var initiatorIndex = remoteTrade.getInitiator().index;
         var recipientIndex = remoteTrade.getRecipient().index;
+        
+        // Reset permissions first
+        $("#proposetradebutton, #canceltradebutton, #accepttradebutton, #rejecttradebutton").hide();
+        $("#trade input, #trade select").prop("disabled", true); // Default locked
 
         if (myIndex === recipientIndex) {
             // Recipient: Accept/Reject
-            $("#proposetradebutton, #canceltradebutton").hide();
-            $("#accepttradebutton").show().prop("disabled", false);
-            $("#rejecttradebutton").show().prop("disabled", false);
+            $("#accepttradebutton, #rejecttradebutton").show().prop("disabled", false);
+            
+            // CRITICAL: Enable inputs so I can change money/properties
+            $("#trade input, #trade select").prop("disabled", false);
+            window.bindTradeListeners();
+            
+            // Re-bind Money listeners (Lost during serialization)
+            var lMoney = document.getElementById("trade-leftp-money");
+            var rMoney = document.getElementById("trade-rightp-money");
+            if (lMoney) { lMoney.onchange = tradeMoneyOnChange; lMoney.onkeydown = tradeMoneyOnKeyDown; }
+            if (rMoney) { rMoney.onchange = tradeMoneyOnChange; rMoney.onkeydown = tradeMoneyOnKeyDown; }
+            
         } else if (myIndex === initiatorIndex) {
             // Proposer: Cancel only
-            $("#proposetradebutton, #accepttradebutton, #rejecttradebutton").hide();
             $("#canceltradebutton").show().prop("disabled", false);
+            
         } else {
             // Spectator
             $("#trade input").prop("disabled", true);
@@ -5144,6 +5267,9 @@ window.handleRemoteAction = function(action, payload, senderPubkey) {
                     $("#proposetradebutton, #canceltradebutton, #accepttradebutton, #rejecttradebutton")
                         .hide()
                         .prop("disabled", true);
+                        
+                    // Default: Disable inputs for spectators
+                    $("#trade input, #trade select").prop("disabled", true);
 
                     // 2. Enable specific buttons based on identity
                     if (myIndex === recipientIdx) {
@@ -5151,6 +5277,10 @@ window.handleRemoteAction = function(action, payload, senderPubkey) {
                         $("#accepttradebutton, #rejecttradebutton")
                             .show()
                             .prop("disabled", false);
+                            
+                        // ENABLE INPUTS so I can counter-offer
+                        $("#trade input, #trade select").prop("disabled", false);
+                        window.bindTradeListeners(); // Bind here too for Host!
                             
                     } else if (myIndex === initiatorIdx) {
                         // I am the Initiator -> Can Cancel
