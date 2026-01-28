@@ -3,7 +3,7 @@
 **Play Monopoly with your friends and family using real Bitcoin (ecash) or test tokens over Nostr!**
 
 This project transforms the classic board game into a Bitcoin experience. It uses the [Cashu](https://github.com/cashubtc) protocol to handle game funds, allowing players to buy in using a Lightning wallet, play the game, and cash out the pot at the end.
-No trusted third party is needed. The game synchronizes between player over [Nostr](https://github.com/nostr-protocol/nostr).
+No trusted third party is needed. The game synchronizes between players using [Nostr](https://github.com/nostr-protocol/nostr).
 
 ---
 
