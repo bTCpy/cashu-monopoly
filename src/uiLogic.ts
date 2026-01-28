@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 import { Clipboard } from '@capacitor/clipboard';
 
 
+
 import { NostrGameManager } from './nostrGame';
 export const nostrManager = new NostrGameManager();
 
@@ -123,37 +124,54 @@ export function initUiLogic() {
 (window as any).getEncodedToken = getEncodedToken;
 }
 
-function loadHistoryUI() {
+function loadHistoryUI(filterMode: 'local' | 'online') {
     const historySelect = document.getElementById("history-select") as HTMLSelectElement;
     const resumePanel = document.getElementById("resume-panel");
     const manager = (window as any).nostrManager;
     
     if (!historySelect || !resumePanel || !manager) return;
 
-    const history = manager.getGameHistory();
+    // 1. Get All History
+    const allHistory = manager.getGameHistory();
 
-    // Hide panel if no history
-    if (history.length === 0) {
+    // 2. Filter based on Mode
+    const filteredHistory = allHistory.filter((item: any) => item.type === filterMode);
+
+    // 3. Hide panel if no games match this mode
+    if (filteredHistory.length === 0) {
         resumePanel.style.display = "none";
         return;
     }
 
+    // 4. Populate Dropdown
     resumePanel.style.display = "block";
     historySelect.innerHTML = `<option value="">-- Select a Game --</option>`;
     
-    history.forEach((item: any) => {
+    filteredHistory.forEach((item: any) => {
         const opt = document.createElement("option");
         opt.value = item.id;
-        opt.innerText = `${item.timestamp} - ${item.id}`;
+        
+        // Nicer formatting
+        let label = item.id;
+        if (filterMode === 'local') {
+            label = `Local Game (${item.timestamp})`;
+        } else {
+            label = `ID: ${item.id} (${item.timestamp})`;
+        }
+        
+        opt.innerText = label;
         historySelect.appendChild(opt);
     });
     
-    const manualOpt = document.createElement("option");
-    manualOpt.value = "MANUAL_ENTRY";
-    manualOpt.innerText = "➕ Enter Game ID manually...";
-    manualOpt.style.fontWeight = "bold"; // Make it stand out
-    manualOpt.style.color = "#4CAF50";
-    historySelect.appendChild(manualOpt);
+    // Only show "Manual Entry" for Online mode
+    if (filterMode === 'online') {
+        const manualOpt = document.createElement("option");
+        manualOpt.value = "MANUAL_ENTRY";
+        manualOpt.innerText = "➕ Enter Game ID manually...";
+        manualOpt.style.fontWeight = "bold";
+        manualOpt.style.color = "#4CAF50";
+        historySelect.appendChild(manualOpt);
+    }
 }
 
 export async function hostGameUI() {
@@ -636,7 +654,6 @@ export function initWalletUi() {
 }
 
 export function setupLobbyUI() {
-    loadHistoryUI();
     
     const btnLocal = document.getElementById('btn-local-game');
     const btnHost = document.getElementById('btn-host-game');
@@ -737,6 +754,23 @@ export function setupLobbyUI() {
         let selectedId = historySelect.value;
         if (!selectedId) return alert("Please select a game.");
         
+        if (selectedId.startsWith("local_")) {
+            // --- RESUME LOCAL GAME ---
+            // 1. Set global ID
+            (window as any).localGameId = selectedId;
+            
+            // 2. Load State from Storage
+            const raw = localStorage.getItem('monopoly_state_' + selectedId);
+            if (raw) {
+                const state = JSON.parse(raw);
+                if (window.loadRemoteGameState) {
+                    window.loadRemoteGameState(state);
+                    alert("Local game resumed!");
+                }
+            }
+            return;
+        }
+        
         if (selectedId === "MANUAL_ENTRY") {
             const manualInput = prompt("Paste the Game ID you want to Host:");
             if (!manualInput) return; // Cancelled
@@ -788,11 +822,28 @@ export function setupLobbyUI() {
     // --- LOCAL BOT MODE ---
     btnLocal?.addEventListener('click', () => {
         // UI
+        loadHistoryUI('local');
         if(hostPanel) hostPanel.style.display = 'none';
         if(joinPanel) joinPanel.style.display = 'none';
         if(startBtn) startBtn.style.display = 'block';
+        
         if(walletSection) walletSection.style.display = 'block';
         if(warningBox) warningBox.style.display = 'block'; 
+        
+        if ((window as any).nostrManager) {
+            (window as any).nostrManager.resetGame();
+            (window as any).connectedPlayers = []; // Clear lobby list
+        }
+        
+        const pCountInput = document.getElementById("playernumber") as HTMLInputElement;
+        const visCount = document.getElementById("visible-player-count");
+        
+        if (pCountInput) {
+            pCountInput.value = "2"; // Default to 2 players (You + AI)
+        }
+        if (visCount) {
+            visCount.innerText = "2";
+        }        
         
         if(resumePanel && shouldShowResume()) resumePanel.style.display = 'block';
 
@@ -803,6 +854,7 @@ export function setupLobbyUI() {
     
     // --- HOST MODE ---
     btnHost?.addEventListener('click', async () => {
+        loadHistoryUI('online');
         if(hostPanel) hostPanel.style.display = 'block';
         if(joinPanel) joinPanel.style.display = 'none';
         if(startBtn) startBtn.style.display = 'block';
@@ -1062,8 +1114,10 @@ function addResyncButton() {
         const board = document.getElementById("board");
         const setup = document.getElementById("setup");
         
+        const isOnline = (window as any).nostrManager && (window as any).nostrManager.gameId;
+        
         if (board && setup) {
-            if (board.style.display !== "none" && setup.style.display === "none") {
+            if (board.style.display !== "none" && setup.style.display === "none" && isOnline) {
                 btn.style.display = "block";
             } else {
                 btn.style.display = "none";
@@ -1076,5 +1130,4 @@ console.log("Current Quote ID:", currentQuoteId);
 (window as any).triggerCashout = function(name: string, token: string) {
      performCashOut(true, name, token); 
 };
-
 
