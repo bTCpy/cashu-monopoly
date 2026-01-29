@@ -121,3 +121,4 @@ The [original browser based version](https://github.com/bTCpy/monopoly) won the 
 
 *   **Game Logic & UI:** [Daniel Moyer (intrepidcoder)](https://github.com/intrepidcoder/monopoly)
 *   **Ecash Protocol:** [Cashu](https://cashu.space)
+*   **Nostr Protocol:** [Nostr](https://github.com/nostr-protocol/nostr)
