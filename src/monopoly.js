@@ -1660,12 +1660,16 @@ function addAlert(alertText) {
 }
 
 function popup(HTML, action, option) {
+	 if (!HTML || HTML.trim() === "") {
+		console.warn("Attempted to show empty popup. Ignored.");
+		return;
+	    }
+	    
 	window.currentPopupAction = action; 
 	
 	document.getElementById("popuptext").innerHTML = HTML;
 	document.getElementById("popup").style.width = "300px";
-	document.getElementById("popup").style.top = "0px";
-	document.getElementById("popup").style.left = "0px";
+
 
 	if (!option && typeof action === "string") {
 		option = action;
@@ -1733,14 +1737,12 @@ function popup(HTML, action, option) {
 	// 4. SHOW POPUP (Explicit Display Mode)
 	var pWrap = document.getElementById("popupwrap");
 	
-	if (window.innerWidth <= 1000) {
-        // Mobile: Force Flexbox for centering
-		pWrap.style.display = "flex";
-		$("#control").hide();
-	} else {
-        // Desktop: Force Block
-		pWrap.style.display = "block";
-	}
+	pWrap.style.display = "flex";
+	
+	if (isMobile()) {
+            $("#control").hide();
+    		}
+	
 
         // 5. Animate Background
 	$("#popupbackground").fadeIn(400, function() {
@@ -2832,7 +2834,7 @@ function showStats() {
 	document.getElementById("statstext").innerHTML = HTML;
 	// Show using animation.
 	$("#statsbackground").fadeIn(400, function() {
-		$("#statswrap").show();
+		$("#statswrap").css("display", "flex");
 	});
 }
 
@@ -3435,13 +3437,35 @@ function setup() {
     var $ = window.jQuery || window.$;
     var AITest = window.AITest;
     
-    // FIX: Declare 'p' and 'playerArray' here so they exist for both branches
     var p; 
     var playerArray;
 
     if (window.GAME_SCALE) {
         GAME_SCALE = window.GAME_SCALE;
+        // Re-init properties with new prices
+        if (window.initClassicEdition) window.initClassicEdition(GAME_SCALE);
+        
+        for (var i = 0; i < 40; i++) {
+            var s = square[i];
+            var priceDiv = document.getElementById("enlarge" + i + "price");
+            
+            if (priceDiv) {
+                // A. Purchasable Properties (Price > 0)
+                if (s.price > 0) {
+                    priceDiv.textContent = s.pricetext;
+                } 
+                // B. Special Fields (Taxes & GO)
+                // Index 0 = GO, Index 4 = City Tax, Index 38 = Luxury Tax, Index 30 = GoToJail 
+                else if (i === 0 || i === 4 || i ==30 || i === 38) {
+                    priceDiv.textContent = s.pricetext;
+                }
+            }
+        }
+        
     }
+    
+    // Default to 1500 if something went wrong, otherwise use calculated split
+    var startingMoney = window.calculatedStartBalance || Math.round(1500 * GAME_SCALE);
 
     if (!$) {
         alert("Error: jQuery not loaded.");
@@ -3536,7 +3560,7 @@ function setup() {
             p.name = lobbyData.name;
             p.color = lobbyData.color.toLowerCase();
             p.pubkey = lobbyData.pubkey; 
-            p.money = Math.round(1500 * GAME_SCALE);
+            p.money = startingMoney;
             p.human = true; 
             p.AI = null;
         }
@@ -3556,7 +3580,7 @@ function setup() {
 
         for (var i = 1; i <= pcount; i++) {
             p = player[playerArray[i - 1]];
-            p.money = Math.round(1500 * GAME_SCALE);
+            p.money = startingMoney;
             
             var colorInput = document.getElementById("player" + i + "color");
             var nameInput = document.getElementById("player" + i + "name");
@@ -3578,14 +3602,6 @@ function setup() {
 	$("#board, #moneybar").show();
 	$("#setup").hide();
 
-	if (pcount === 2) {
-		document.getElementById("stats").style.width = "454px";
-	} else if (pcount === 3) {
-		document.getElementById("stats").style.width = "686px";
-	}
-
-	document.getElementById("stats").style.top = "0px";
-	document.getElementById("stats").style.left = "0px";
 
 	play();
 	
@@ -4172,6 +4188,11 @@ function makeDraggable(element) {
             return true;
         }
         
+        // return TRUE to stop the panel drag and allow the scroll.
+        if (target.id === "owned" || $(target).closest("#owned").length > 0) {
+            return true;
+        }
+        
         // If we touched an input, button, or menu link, let it click!
         const tagName = target.tagName.toUpperCase();
         if (tagName === 'INPUT' || tagName === 'BUTTON' || tagName === 'A' || tagName === 'SELECT') {
@@ -4527,7 +4548,9 @@ window.loadRemoteGameState = function(remoteState) {
             if (raw.pubkey) newP.pubkey = raw.pubkey; 
 
             player[i] = newP;
+            
         }
+        window.player = player;
     }
     
     // AUTO-CORRECT MY INDEX
@@ -4660,11 +4683,11 @@ window.loadRemoteGameState = function(remoteState) {
         }
         
         // 2. Show/Hide
-        // Use 'flex' for mobile centering if visible
-        if (remoteState.popupVis !== 'none' && window.innerWidth <= 1000) {
+        // Use 'flex' for centering if visible
+        if (remoteState.popupVis !== 'none') {
             popupWrap.style.display = 'flex';
         } else {
-            popupWrap.style.display = remoteState.popupVis;
+            popupWrap.style.display = 'none';
         }
         popupBg.style.display = remoteState.overlayVis;
 
