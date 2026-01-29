@@ -5,6 +5,8 @@
 
 Cashu Monopoly takes the classic property trading game and adds **real stakes**. There is no central game server, no fake game currency, and no middlemen. The game logic runs entirely on the Host's device, communication happens via decentralized [Nostr](https://github.com/nostr-protocol/nostr) relays, and financial settlement is handled instantly via [Cashu](https://github.com/cashubtc) tokens.
 
+![Demo](invitation_optimized.gif)
+
 ## 🌟 Key Features
 
 ### 💰 Real-Money Economy
