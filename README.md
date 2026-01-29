@@ -110,6 +110,11 @@ This project is designed as a fun, interactive educational tool.
 
 ---
 
+## 👑 Awards
+
+The [original browser based version](https://github.com/bTCpy/monopoly) won the community choice award of the [nut november hackathon](https://nutnovember.org/).  
+
+
 ## ❤️ Credits
 
 *   **Game Logic & UI:** [Daniel Moyer (intrepidcoder)](https://github.com/intrepidcoder/monopoly)
