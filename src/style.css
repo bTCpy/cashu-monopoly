@@ -342,9 +342,6 @@ td {
 }
 
 #popupwrap {
-	position: absolute;
-	top: 255px;
-	left: 0px;
 	width: 100%;
 	display: none;
 	background-color: transparent;
@@ -1057,6 +1054,8 @@ a[href*="github.com"] .social-icon:hover {
     flex: 1;                /* Ensure it fills available space properly */
 }
 
+
+
 @media only screen and (max-width: 1000px), only screen and (max-height: 900px) {
 
     /* 1. Pin Control Panel to Bottom of Screen */
@@ -1149,4 +1148,81 @@ a[href*="github.com"] .social-icon:hover {
 
 #cashout-modal {
     z-index: 2147483647 !important; /* Max integer value to ensure it's on top of everything */
+}
+
+#owned {
+    /* Allow vertical scrolling with finger on mobile */
+    touch-action: pan-y !important; 
+    
+    /* Ensure scrollbar visual */
+    overflow-y: auto !important; 
+    
+    /* Optional: Limit height on very small screens so buttons below don't disappear */
+    max-height: 50vh; 
+}
+
+/* 1. Force Full Screen Overlay & Centering (Like Popups) */
+#statswrap {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    
+    /* Center the content */
+    display: none; /* JS toggles this */
+    align-items: center;
+    justify-content: center;
+    z-index: 6001 !important;
+    
+    /* Allow clicking through the empty parts if needed, 
+       but usually we want to block interaction with the board */
+    background-color: rgba(0,0,0,0.5); 
+}
+
+/* 2. Make the Stats Box Scrollable & Responsive */
+#stats {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    margin: 0 !important;
+    
+    /* Fit to screen */
+    width: auto !important;
+    max-width: 95% !important;
+    max-height: 90vh !important; /* Leave space at top/bottom */
+    
+    /* Enable Scrolling */
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    
+    /* Fix legacy overflow hidden */
+    display: flex !important;
+    flex-direction: column;
+}
+
+/* 3. Unlock the inner text container */
+#statstext {
+    overflow: visible !important;
+    height: auto !important;
+}
+
+/* 4. Fix the internal table layout for Mobile */
+#statstext table {
+    width: 100%;
+}
+
+/* On small screens, stack the player cards vertically if they are in a table row */
+@media only screen and (max-width: 600px) {
+    #statstext > table > tbody > tr {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    #statstext td.statscell {
+        width: 100%;
+        box-sizing: border-box;
+        margin-bottom: 10px;
+    }
 }
