@@ -9,7 +9,6 @@ Cashu Monopoly takes the classic property trading game and adds **real stakes**.
 
 ### 💰 Real-Money Economy
 Unlike standard games where money is just a database entry, here **money is data**.
-*   **Buy-In:** Players must deposit real Satoshis (via Lightning/Cashu) to enter the lobby.
 *   **Dynamic Pot:** The in-game economy scales based on the total buy-in.
 *   **Bankruptcy:** If you lose in the game, you lose real value.
 *   **Cash Out:** The winner takes the pot.
@@ -28,7 +27,7 @@ When a remote player wins:
 4.  Only the Winner's device can decrypt it and claim the funds.
 
 
-## 👨‍👩‍👧‍👦 Why Play This?
+### 👨‍👩‍👧‍👦 Why Play This?
 
 This project is designed as a fun, interactive educational tool.
 
@@ -39,7 +38,7 @@ This project is designed as a fun, interactive educational tool.
 
 ---
 
-## ✨ Features
+### 🏦 Bitcoin Banks
 
 *   **Mint Agnostic:** Connect to any Cashu Mint (Minibits, TestNut, or your own local Docker mint).
 *   **Dynamic Scaling:** The game math adjusts automatically. Play a "High Roller" game with 1,000,000 sats or a "Micro" game with 500 sats.
@@ -49,12 +48,64 @@ This project is designed as a fun, interactive educational tool.
 
 ---
 
+## 🚀 Getting Started
+
+### Prerequisites
+*   Node.js (v18+)
+*   Android Studio (for mobile emulation)
+
+### Installation
+
+1.  **Clone the repo**
+    ```bash
+    git clone https://github.com/your-repo/cashu-monopoly.git
+    cd cashu-monopoly
+    ```
+
+2.  **Install dependencies**
+    ```bash
+    npm install
+    ```
+
+3.  **Run in Browser (Development)**
+    ```bash
+    npm run dev
+    ```
+
+4.  **Build for Android**
+    ```bash
+    npm run build
+    npx cap sync
+    npx cap open android
+    ```
+
+---
+
+## 🎮 How to Play
+
+1.  **Fund Your Wallet:** Use the built-in wallet to mint Testnut (Testnet) or Minibits (Mainnet) tokens via Lightning Invoice.
+2.  **Select Mode:**
+    *   **vs Bot:** Local offline play against an AI.
+    *   **Host:** Create a P2P lobby. You must define the buy-in amount.
+    *   **Join:** Paste a Game ID from a friend.
+3.  **Play:** Rules follow standard property trading mechanics.
+4.  **Win:**
+    *   **Host Wins:** Funds remain in the local wallet.
+    *   **Joiner Wins:** A modal appears with the decrypted token. Copy it to cash out!
+
+---
+
+
+
+
 ## ⚠️ Disclaimer
 
 **This software is in BETA.**
 
 *   **Do not** play with amounts you cannot afford to lose.
 *   **Do not** use this for high-stakes gambling.
+*   There is **no** cloud backup.
+*   If you clear your browser cache or uninstall the app during a game, **funds will be lost.**
 *   Use the "TestNut" mint for risk-free testing.
 
 ---
