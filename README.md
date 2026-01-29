@@ -1,11 +1,32 @@
 # ⚡ Cashu Monopoly 🎩
 
-**Play Monopoly with your friends and family using real Bitcoin (ecash) or test tokens over Nostr!**
 
-This project transforms the classic board game into a Bitcoin experience. It uses the [Cashu](https://github.com/cashubtc) protocol to handle game funds, allowing players to buy in using a Lightning wallet, play the game, and cash out the pot at the end.
-No trusted third party is needed. The game synchronizes between players using [Nostr](https://github.com/nostr-protocol/nostr).
+**A Peer-to-Peer Board Game powered by Bitcoin e-cash **
 
----
+Cashu Monopoly takes the classic property trading game and adds **real stakes**. There is no central game server, no fake game currency, and no middlemen. The game logic runs entirely on the Host's device, communication happens via decentralized [Nostr](https://github.com/nostr-protocol/nostr) relays, and financial settlement is handled instantly via [Cashu](https://github.com/cashubtc) tokens.
+
+## 🌟 Key Features
+
+### 💰 Real-Money Economy
+Unlike standard games where money is just a database entry, here **money is data**.
+*   **Buy-In:** Players must deposit real Satoshis (via Lightning/Cashu) to enter the lobby.
+*   **Dynamic Pot:** The in-game economy scales based on the total buy-in.
+*   **Bankruptcy:** If you lose in the game, you lose real value.
+*   **Cash Out:** The winner takes the pot.
+
+### 📡 Serverless P2P Multiplayer
+This app requires **zero backend infrastructure**.
+*   **The Host is the Server:** The game state lives in the Host's local browser storage.
+*   **Nostr Transport:** All game moves (Roll Dice, Buy, Trade) are signed events sent over the decentralized [Nostr](https://github.com/nostr-protocol/nostr) network.
+*   **Censorship Resistant:** No one can shut down the game server because *you* are the server.
+
+### 🔐 Cryptographic Settlement (NIP-44)
+When a remote player wins:
+1.  The Host's device generates a **Cashu Token** (Bearer Asset) for the total pot.
+2.  The token is **Encrypted** using the Winner's Nostr Public Key (NIP-44).
+3.  It travels publicly over relays as "garbage text."
+4.  Only the Winner's device can decrypt it and claim the funds.
+
 
 ## 👨‍👩‍👧‍👦 Why Play This?
 
@@ -13,7 +34,7 @@ This project is designed as a fun, interactive educational tool.
 
 *   **Financial Literacy:** Teach children (and adults!) how to handle money, calculate inflows and outflows, and manage assets.
 *   **Bitcoin Education:** It is the perfect safe sandbox to introduce friends and family to **Bitcoin, Lightning, and Ecash**.
-*   **Micro-Stakes:** You can play with tiny amounts (e.g., 500 sats, which is a fraction of a Dollar). This makes the game feel "real" and exciting without huge financial risk.
+*   **Micro-Stakes:** You can play with tiny amounts (e.g., 1000 sats, which is a fraction of a Dollar). This makes the game feel "real" and exciting without huge financial risk.
 *   **Math Skills:** The game dynamically scales prices based on your buy-in. If you buy in with 3000 sats, all rents, salaries, and fines double automatically!
 
 ---
